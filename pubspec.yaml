@@ -1,0 +1,16 @@
+name: watch_earn_app
+description: A Watch and Earn Flutter application with Unity Ads.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  unity_ads_plugin: ^0.3.10
+
+flutter:
+  uses-material-design: true
+  
