@@ -28,19 +28,20 @@ jobs:
         run: |
           flutter create --org com.watchearn.app --project-name watchearnapp .
 
-      - name: Fix Android Namespace and Package
+      - name: Clean up AndroidManifest and Setup Configurations
         run: |
-          sed -i 's/package="com.example.watchearnapp"//g' android/app/src/main/AndroidManifest.xml || true
-          sed -i 's/package="com.watchearn.app.watchearnapp"//g' android/app/src/main/AndroidManifest.xml || true
+          # Remove duplicate AdMob ID if already present
+          sed -i '/com.google.android.gms.ads.APPLICATION_ID/d' android/app/src/main/AndroidManifest.xml || true
+          
+          # Remove obsolete package attribute
+          sed -i 's/package="[^"]*"//g' android/app/src/main/AndroidManifest.xml || true
 
-      - name: Configure Android SDK versions
-        run: |
+          # Insert clean single AdMob App ID
+          sed -i '/<\/application>/i \        <meta-data android:name="com.google.android.gms.ads.APPLICATION_ID" android:value="ca-app-pub-3940256099942544~3347511713"/>' android/app/src/main/AndroidManifest.xml
+
+          # Configure minSdkVersion to 23 for Firebase Auth
           sed -i 's/minSdkVersion = .*/minSdkVersion = 23/' android/app/build.gradle || true
           sed -i 's/minSdkVersion .*/minSdkVersion 23/' android/app/build.gradle || true
-
-      - name: Configure AdMob App ID
-        run: |
-          sed -i '/<\/application>/i \        <meta-data android:name="com.google.android.gms.ads.APPLICATION_ID" android:value="ca-app-pub-3940256099942544~3347511713"/>' android/app/src/main/AndroidManifest.xml
 
       - name: Install dependencies
         run: flutter pub get
