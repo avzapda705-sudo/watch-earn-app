@@ -26,30 +26,58 @@ jobs:
 
       - name: Create Flutter structure
         run: |
-          flutter create --org com.watchearn.app --project-name watchearnapp .
+          flutter create --org com.example.watchearn.app --project-name watchearnapp .
+
+      - name: Add Google Services Plugin to root build.gradle
+        run: |
+          cat << 'EOF' > android/settings.gradle
+          pluginManagement {
+              def flutterSdkPath = {
+                  def properties = new Properties()
+                  file("local.properties").withInputStream { properties.load(it) }
+                  def flutterSdkPath = properties.getProperty("flutter.sdk")
+                  assert flutterSdkPath != null : "flutter.sdk not set in local.properties"
+                  return flutterSdkPath
+              }()
+
+              includeBuild("$flutterSdkPath/packages/flutter_tools/gradle")
+
+              repositories {
+                  google()
+                  mavenCentral()
+                  gradlePluginPortal()
+              }
+          }
+
+          plugins {
+              id "dev.flutter.flutter-plugin-loader" version "1.0.0"
+              id "com.android.application" version "8.3.2" apply false
+              id "org.jetbrains.kotlin.android" version "1.9.0" apply false
+              id "com.google.gms.google-services" version "4.4.2" apply false
+          }
+
+          include ":app"
+          EOF
 
       - name: Write clean AndroidManifest
         run: |
           cat << 'EOF' > android/app/src/main/AndroidManifest.xml
-          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+              package="com.example.watchearnapp">
               <uses-permission android:name="android.permission.INTERNET"/>
+              <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
               <application
-                  android:label="watchearnapp"
+                  android:label="Watch &amp; Earn Pro"
                   android:name="${applicationName}"
                   android:icon="@mipmap/ic_launcher">
                   <activity
                       android:name=".MainActivity"
                       android:exported="true"
                       android:launchMode="singleTop"
-                      android:taskAffinity=""
                       android:theme="@style/LaunchTheme"
                       android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
                       android:hardwareAccelerated="true"
                       android:windowSoftInputMode="adjustResize">
-                      <meta-data
-                        android:name="io.flutter.embedding.android.NormalTheme"
-                        android:resource="@style/NormalTheme"
-                        />
                       <intent-filter>
                           <action android:name="android.intent.action.MAIN"/>
                           <category android:name="android.intent.category.LAUNCHER"/>
@@ -58,50 +86,46 @@ jobs:
                   <meta-data
                       android:name="flutterEmbedding"
                       android:value="2" />
-                  <meta-data
-                      android:name="com.google.android.gms.ads.APPLICATION_ID"
-                      android:value="ca-app-pub-3940256099942544~3347511713"/>
               </application>
           </manifest>
           EOF
 
-      - name: Write build.gradle with minSdkVersion 23
+      - name: Write build.gradle with Google Services & minSdk 23
         run: |
           cat << 'EOF' > android/app/build.gradle
           plugins {
               id "com.android.application"
               id "kotlin-android"
               id "dev.flutter.flutter-gradle-plugin"
+              id "com.google.gms.google-services"
           }
 
           android {
-              namespace = "com.watchearn.app.watchearnapp"
+              namespace = "com.example.watchearnapp"
               compileSdk = 34
               ndkVersion = flutter.ndkVersion
 
               compileOptions {
-                  sourceCompatibility = JavaVersion.VERSION_1_8
-                  targetCompatibility = JavaVersion.VERSION_1_8
+                  sourceCompatibility = JavaVersion.VERSION_17
+                  targetCompatibility = JavaVersion.VERSION_17
               }
 
               kotlinOptions {
-                  jvmTarget = "1.8"
+                  jvmTarget = JavaVersion.VERSION_17
               }
 
               defaultConfig {
-                  applicationId = "com.watchearn.app.watchearnapp"
+                  applicationId = "com.example.watchearnapp"
                   minSdk = 23
                   targetSdk = 34
-                  versionCode = flutter.versionCode
-                  versionName = flutter.versionName
+                  versionCode = 1
+                  versionName = "1.0.0"
                   multiDexEnabled = true
               }
 
               buildTypes {
                   release {
                       signingConfig = signingConfigs.debug
-                      minifyEnabled false
-                      shrinkResources false
                   }
               }
           }
@@ -111,7 +135,7 @@ jobs:
           }
           EOF
 
-      - name: Install dependencies
+      - name: Install Dependencies
         run: flutter pub get
 
       - name: Build APK
@@ -120,6 +144,6 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: app-release
+          name: release-apk
           path: build/app/outputs/flutter-apk/app-release.apk
           
