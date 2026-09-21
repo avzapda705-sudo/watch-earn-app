@@ -28,6 +28,16 @@ jobs:
         run: |
           flutter create --org com.example --project-name watchearnapp .
 
+      - name: Move and verify google-services.json
+        run: |
+          if [ -f "google-services.json" ]; then
+            cp google-services.json android/app/
+          fi
+          if [ ! -f "android/app/google-services.json" ]; then
+            echo "ERROR: google-services.json not found in android/app/"
+            exit 1
+          fi
+
       - name: Configure gradle.properties
         run: |
           cat << 'EOF' > android/gradle.properties
@@ -36,7 +46,7 @@ jobs:
           android.enableJetifier=false
           EOF
 
-      - name: Configure root settings.gradle for Firebase
+      - name: Configure root settings.gradle
         run: |
           cat << 'EOF' > android/settings.gradle
           pluginManagement {
@@ -98,7 +108,7 @@ jobs:
           </manifest>
           EOF
 
-      - name: Write build.gradle with Google Services
+      - name: Write build.gradle
         run: |
           cat << 'EOF' > android/app/build.gradle
           plugins {
