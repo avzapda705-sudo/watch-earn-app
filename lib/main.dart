@@ -7,7 +7,6 @@ bool isFirebaseReady = false;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
   try {
     await Firebase.initializeApp();
     isFirebaseReady = true;
@@ -15,7 +14,6 @@ void main() async {
     isFirebaseReady = false;
     debugPrint("Firebase init note: $e");
   }
-
   runApp(const WatchAndEarnApp());
 }
 
@@ -63,7 +61,6 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _otpController = TextEditingController();
-
   String? _verificationId;
   bool _isOtpSent = false;
   bool _isLoading = false;
@@ -86,7 +83,6 @@ class _LoginScreenState extends State<LoginScreen> {
     }
 
     setState(() => _isLoading = true);
-
     try {
       await FirebaseAuth.instance.verifyPhoneNumber(
         phoneNumber: '+91$phone',
@@ -176,7 +172,6 @@ class _LoginScreenState extends State<LoginScreen> {
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 40.0),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               const SizedBox(height: 30),
               Container(
@@ -197,7 +192,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 style: TextStyle(
                   fontSize: 28,
                   fontWeight: FontWeight.bold,
-                  letterSpacing: 0.5,
                 ),
               ),
               const SizedBox(height: 8),
@@ -361,9 +355,9 @@ class _HomeScreenState extends State<HomeScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Minimum withdrawal: $minWithdrawLimit Coins',
-              style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
+            const Text(
+              'Minimum withdrawal: 100 Coins',
+              style: TextStyle(fontSize: 13, color: Colors.grey),
             ),
             const SizedBox(height: 16),
             TextField(
@@ -582,4 +576,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     backgroundColor: Colors.amber.shade700,
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  
+                  ),
+                  child: Text(_claimedDailyBonus ? 'Claimed' : 'Claim'),
+                ),
+              ),
+      
