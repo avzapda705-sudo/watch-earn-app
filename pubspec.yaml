@@ -9,7 +9,9 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  unity_ads_plugin: ^0.3.10
+    google_mobile_ads: ^5.1.0
+  share_plus: ^9.0.0
+  
 
 flutter:
   uses-material-design: true
