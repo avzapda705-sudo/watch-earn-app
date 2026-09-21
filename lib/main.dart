@@ -21,8 +21,8 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         brightness: Brightness.dark,
         primarySwatch: Colors.amber,
-        scaffoldBackgroundColor: const Color(0xFF0F0F12),
-        cardColor: const Color(0xFF1B1C22),
+        scaffoldBackgroundColor: const Color(0xFF121212),
+        cardColor: const Color(0xFF1E1E1E),
         useMaterial3: true,
       ),
       home: const MainNavigationScreen(),
@@ -46,9 +46,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   late final String _userReferralCode;
 
   // AdMob IDs
-  final String _rewardedAdUnitId = 'ca-app-pub-5150845800087406/3645352028';
-  final String _interstitialAdUnitId = 'ca-app-pub-5150845800087406/1725676408';
-  final String _bannerAdUnitId = 'ca-app-pub-5150845800087406/8514535326';
+  final String _rewardedAdUnitId = "ca-app-pub-3940256099942544/5224354917";
+  final String _interstitialAdUnitId = "ca-app-pub-5150845800087406/1723070460";
+  final String _bannerAdUnitId = "ca-app-pub-5150845800087406/8334333520";
 
   RewardedAd? _rewardedAd;
   InterstitialAd? _interstitialAd;
@@ -59,7 +59,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   @override
   void initState() {
     super.initState();
-    _userReferralCode = 'PRO${Random().nextInt(899999) + 100000}';
+    _userReferralCode = "PRO${Random().nextInt(899999) + 100000}";
     _loadBannerAd();
     _loadInterstitialAd();
     _loadRewardedAd();
@@ -72,7 +72,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       request: const AdRequest(),
       listener: BannerAdListener(
         onAdLoaded: (ad) => setState(() => _isBannerLoaded = true),
-        onAdFailedToLoad: (ad, error) => ad.dispose(),
+        onAdFailedToLoad: (ad, error) {
+          ad.dispose();
+        },
       ),
     )..load();
   }
@@ -82,17 +84,14 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       adUnitId: _interstitialAdUnitId,
       request: const AdRequest(),
       adLoadCallback: InterstitialAdLoadCallback(
-        onAdLoaded: (ad) => _interstitialAd = ad,
-        onAdFailedToLoad: (error) => _interstitialAd = null,
+        onAdLoaded: (ad) {
+          _interstitialAd = ad;
+        },
+        onAdFailedToLoad: (error) {
+          _interstitialAd = null;
+        },
       ),
     );
-  }
-
-  void _showInterstitialAd() {
-    if (_interstitialAd != null) {
-      _interstitialAd!.show();
-      _loadInterstitialAd();
-    }
   }
 
   void _loadRewardedAd() {
@@ -101,101 +100,76 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       request: const AdRequest(),
       rewardedAdLoadCallback: RewardedAdLoadCallback(
         onAdLoaded: (ad) {
-          _rewardedAd = ad;
-          if (_isLoadingReward) {
-            setState(() => _isLoadingReward = false);
-            _playRewardedAd();
-          }
+          setState(() {
+            _rewardedAd = ad;
+            _isLoadingReward = false;
+          });
         },
         onAdFailedToLoad: (error) {
-          _rewardedAd = null;
-          if (_isLoadingReward) {
-            setState(() => _isLoadingReward = false);
-            _showMessage('એડ લોડ કરવામાં ક્ષતિ આવી, ફરી પ્રયત્ન કરો.');
-          }
+          setState(() {
+            _rewardedAd = null;
+            _isLoadingReward = false;
+          });
         },
       ),
     );
   }
 
-  void _triggerWatchAd() {
+  void _showRewardedAd() {
     if (_adsRemaining <= 0) {
-      _showMessage('આજની એડ લિમિટ પૂરી થઈ ગઈ છે! આવતીકાલે ફરી આવો.');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('આજના એડ્સ પૂરા થઈ ગયા છે!')),
+      );
       return;
     }
+
     if (_rewardedAd != null) {
-      _playRewardedAd();
+      _rewardedAd!.fullScreenContentCallback = FullScreenContentCallback(
+        onAdDismissedFullScreenContent: (ad) {
+          ad.dispose();
+          _loadRewardedAd();
+        },
+        onAdFailedToShowFullScreenContent: (ad, error) {
+          ad.dispose();
+          _loadRewardedAd();
+        },
+      );
+
+      _rewardedAd!.show(
+        onUserEarnedReward: (AdWithoutView ad, RewardItem reward) {
+          setState(() {
+            _coins += 10;
+            _adsRemaining--;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('+10 Coins જમા થયા!')),
+          );
+        },
+      );
+      _rewardedAd = null;
     } else {
       setState(() => _isLoadingReward = true);
-      _showMessage('જાહેરાત તૈયાર થઈ રહી છે...');
       _loadRewardedAd();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('એડ લોડ થઈ રહી છે, ફરી પ્રયત્ન કરો.')),
+      );
     }
-  }
-
-  void _playRewardedAd() {
-    _rewardedAd?.fullScreenContentCallback = FullScreenContentCallback(
-      onAdDismissedFullScreenContent: (ad) {
-        ad.dispose();
-        _loadRewardedAd();
-      },
-      onAdFailedToShowFullScreenContent: (ad, error) {
-        ad.dispose();
-        _loadRewardedAd();
-      },
-    );
-
-    _rewardedAd?.show(onUserEarnedReward: (AdWithoutView ad, RewardItem reward) {
-      setState(() {
-        _coins += 10;
-        _adsRemaining--;
-      });
-      _showMessage('અભિનંદન! ૧૦ કોઈન્સ જમા થયા!');
-    });
-    _rewardedAd = null;
   }
 
   void _claimDailyBonus() {
-    if (_claimedDaily) {
-      _showMessage('આજનો ડેઇલી બોનસ તમે મેળવી લીધો છે!');
-      return;
+    if (!_claimedDaily) {
+      setState(() {
+        _coins += 25;
+        _claimedDaily = true;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('+25 Coins ડેઇલી બોનસ મળ્યું!')),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('આજનું બોનસ પહેલેથી લઈ લીધું છે!')),
+      );
     }
-    setState(() {
-      _coins += 25;
-      _claimedDaily = true;
-    });
-    _showMessage('અભિનંદન! ડેઇલી બોનસના ૨૫ કોઈન્સ મળ્યા!');
-    _showInterstitialAd();
-  }
-
-  void _applyReferralCode(String code) {
-    if (_hasUsedReferral) {
-      _showMessage('તમે પહેલાથી જ રેફરલ કોડ ઉપયોગ કરી લીધો છે!');
-      return;
-    }
-    if (code.trim().isEmpty) {
-      _showMessage('કૃપા કરીને સાચો રેફરલ કોડ દાખલ કરો.');
-      return;
-    }
-    if (code.trim().toUpperCase() == _userReferralCode) {
-      _showMessage('તમે તમારો પોતાનો રેફરલ કોડ વાપરી ના શકો.');
-      return;
-    }
-    setState(() {
-      _coins += 50;
-      _hasUsedReferral = true;
-    });
-    _showMessage('શાનદાર! રેફરલ બોનસના ૫૦ કોઈન્સ મળ્યા!');
-    _showInterstitialAd();
-  }
-
-  void _showMessage(String text) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(text, style: const TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.amber[800],
-        duration: const Duration(seconds: 2),
-      ),
-    );
   }
 
   @override
@@ -208,125 +182,115 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final List<Widget> pages = [
-      _buildHomeView(),
-      _buildReferView(),
-      _buildWalletView(),
-    ];
-
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Watch & Earn Pro', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5)),
-        backgroundColor: const Color(0xFF14151B),
-        elevation: 0,
+        title: const Text('Watch & Earn Pro', style: TextStyle(fontWeight: FontWeight.bold)),
+        backgroundColor: Colors.black,
         actions: [
           Container(
             margin: const EdgeInsets.only(right: 16),
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: Colors.amber.withOpacity(0.15),
+              color: Colors.amber.withOpacity(0.2),
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: Colors.amber.withOpacity(0.5)),
+              border: Border.all(color: Colors.amber),
             ),
             child: Row(
               children: [
-                const Icon(Icons.monetization_on, color: Colors.amber, size: 18),
+                const Icon(Icons.monetization_on, color: Colors.amber, size: 20),
                 const SizedBox(width: 6),
-                Text('$_coins', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.amber)),
+                Text('$_coins', style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.bold)),
               ],
             ),
           )
         ],
       ),
-      bottomNavigationBar: Column(
-        mainAxisSize: MainAxisSize.min,
+      body: Column(
         children: [
+          Expanded(
+            child: IndexedStack(
+              index: _currentIndex,
+              children: [
+                _buildHomeScreen(),
+                _buildReferScreen(),
+                _buildWalletScreen(),
+              ],
+            ),
+          ),
           if (_isBannerLoaded && _bannerAd != null)
             SizedBox(
               width: _bannerAd!.size.width.toDouble(),
               height: _bannerAd!.size.height.toDouble(),
               child: AdWidget(ad: _bannerAd!),
             ),
-          NavigationBar(
-            selectedIndex: _currentIndex,
-            onDestinationSelected: (index) => setState(() => _currentIndex = index),
-            backgroundColor: const Color(0xFF14151B),
-            indicatorColor: Colors.amber.withOpacity(0.25),
-            destinations: const [
-              NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home, color: Colors.amber), label: 'Home'),
-              NavigationDestination(icon: Icon(Icons.card_giftcard_outlined), selectedIcon: Icon(Icons.card_giftcard, color: Colors.amber), label: 'Refer & Earn'),
-              NavigationDestination(icon: Icon(Icons.account_balance_wallet_outlined), selectedIcon: Icon(Icons.account_balance_wallet, color: Colors.amber), label: 'Wallet'),
-            ],
-          ),
         ],
       ),
-      body: pages[_currentIndex],
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _currentIndex,
+        onDestinationSelected: (index) => setState(() => _currentIndex = index),
+        destinations: const [
+          NavigationDestination(icon: Icon(Icons.home), label: 'Home'),
+          NavigationDestination(icon: Icon(Icons.card_giftcard), label: 'Refer & Earn'),
+          NavigationDestination(icon: Icon(Icons.account_balance_wallet), label: 'Wallet'),
+        ],
+      ),
     );
   }
 
-  Widget _buildHomeView() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
+  Widget _buildHomeScreen() {
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
       child: Column(
         children: [
-          Container(
-            padding: const EdgeInsets.all(24),
-            width: double.infinity,
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(colors: [Color(0xFF2B281B), Color(0xFF1A1915)]),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: Colors.amber.withOpacity(0.3)),
-            ),
-            child: Column(
-              children: [
-                const Icon(Icons.stars, color: Colors.amber, size: 48),
-                const SizedBox(height: 8),
-                const Text('કુલ બેલેન્સ', style: TextStyle(color: Colors.grey, fontSize: 14)),
-                const SizedBox(height: 4),
-                Text('$_coins Coins', style: const TextStyle(fontSize: 34, fontWeight: FontWeight.bold, color: Colors.amber)),
-                const SizedBox(height: 4),
-                Text('લગભગ ₹${(_coins / 10).toStringAsFixed(1)} બરાબર', style: const TextStyle(color: Colors.greenAccent, fontSize: 13)),
-              ],
+          Card(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            child: Padding(
+              padding: const EdgeInsets.all(20.0),
+              child: Column(
+                children: [
+                  const Icon(Icons.star, color: Colors.amber, size: 48),
+                  const SizedBox(height: 8),
+                  const Text('કુલ બેલેન્સ', style: TextStyle(color: Colors.grey)),
+                  const SizedBox(height: 4),
+                  Text('$_coins Coins', style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.amber)),
+                  const SizedBox(height: 4),
+                  Text('લગભગ ₹${(_coins / 10).toStringAsFixed(1)} બરાબર', style: const TextStyle(color: Colors.greenAccent)),
+                ],
+              ),
             ),
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 16),
           Row(
             children: [
               Expanded(
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1B1C22),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Column(
-                    children: [
-                      const Text('બાકી એડ્સ', style: TextStyle(color: Colors.grey, fontSize: 13)),
-                      const SizedBox(height: 6),
-                      Text('$_adsRemaining / 15', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.amber)),
-                    ],
+                child: Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      children: [
+                        const Text('બાકી એડ્સ', style: TextStyle(color: Colors.grey)),
+                        const SizedBox(height: 8),
+                        Text('$_adsRemaining / 15', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.amber)),
+                      ],
+                    ),
                   ),
                 ),
               ),
-              const SizedBox(width: 14),
+              const SizedBox(width: 12),
               Expanded(
-                child: InkWell(
-                  onTap: _claimDailyBonus,
-                  borderRadius: BorderRadius.circular(16),
-                  child: Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1B1C22),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: _claimedDaily ? Colors.transparent : Colors.greenAccent.withOpacity(0.4)),
-                    ),
-                    child: Column(
-                      children: [
-                        const Text('ડેઇલી બોનસ', style: TextStyle(color: Colors.grey, fontSize: 13)),
-                        const SizedBox(height: 6),
-                        Text(_claimedDaily ? 'મેળવી લીધું' : '+25 મેળવો',
-                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: _claimedDaily ? Colors.grey : Colors.greenAccent)),
-                      ],
+                child: Card(
+                  child: InkWell(
+                    onTap: _claimDailyBonus,
+                    borderRadius: BorderRadius.circular(12),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        children: [
+                          const Text('ડેઇલી બોનસ', style: TextStyle(color: Colors.grey)),
+                          const SizedBox(height: 8),
+                          Text(_claimedDaily ? 'મેળવી લીધું' : '+25 મેળવો', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.greenAccent)),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -336,15 +300,20 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
           const SizedBox(height: 24),
           SizedBox(
             width: double.infinity,
-            height: 56,
+            height: 54,
             child: ElevatedButton.icon(
-              onPressed: _isLoadingReward ? null : _triggerWatchAd,
+              onPressed: _isLoadingReward ? null : _showRewardedAd,
               icon: _isLoadingReward
-                  ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2))
-                  : const Icon(Icons.play_circle_fill, color: Colors.black, size: 26),
-              label: Text(_isLoadingReward ? 'લોડ થઈ રહી છે...' : 'વિડિયો જુઓ અને કમાઓ (+10 Coins)',
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black)),
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.amber, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
+                  : const Icon(Icons.play_circle_fill, color: Colors.black),
+              label: Text(
+                _isLoadingReward ? 'લોડ થઈ રહી છે...' : 'વિડિયો જુઓ અને કમાઓ (+10 Coins)',
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.amber,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
             ),
           ),
         ],
@@ -352,172 +321,71 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     );
   }
 
-  Widget _buildReferView() {
-    final refController = TextEditingController();
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(24),
-            width: double.infinity,
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(colors: [Color(0xFF1E2838), Color(0xFF141923)]),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: Colors.blueAccent.withOpacity(0.3)),
+  Widget _buildReferScreen() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.share, size: 64, color: Colors.amber),
+            const SizedBox(height: 16),
+            const Text('મિત્રોને ઇન્વાઇટ કરો', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            const Text('દરેક રેફરલ પર મેળવો 50 કોઈન્સ!', style: TextStyle(color: Colors.grey)),
+            const SizedBox(height: 24),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.amber, style: BorderStyle.solid),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: SelectableText(
+                _userReferralCode,
+                style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, letterSpacing: 2, color: Colors.amber),
+              ),
             ),
-            child: Column(
-              children: [
-                const Icon(Icons.people_alt, color: Colors.lightBlueAccent, size: 50),
-                const SizedBox(height: 12),
-                const Text('મિત્રોને ઇન્વાઇટ કરો અને કમાઓ', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
-                const SizedBox(height: 8),
-                const Text('દરેક રેફરલ પર તમને અને તમારા મિત્ર બંનેને ૫૦ કોઈન્સ મફત મળશે!',
-                    textAlign: TextAlign.center, style: TextStyle(color: Colors.grey, fontSize: 13)),
-                const SizedBox(height: 20),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: Colors.black38,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.white24, style: BorderStyle.solid),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(_userReferralCode, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, letterSpacing: 2, color: Colors.amber)),
-                      IconButton(
-                        icon: const Icon(Icons.copy, color: Colors.white70),
-                        onPressed: () {
-                          Clipboard.setData(ClipboardData(text: _userReferralCode));
-                          _showMessage('રેફરલ કોડ કોપી થઈ ગયો!');
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 18),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      Share.share(
-                        'મિત્ર! Watch & Earn Pro એપ ડાઉનલોડ કર અને ઘરે બેઠા પૈસા કમાઓ.\nમારો રેફરલ કોડ વાપરીને ૫૦ કોઈન્સ ફ્રી મેળવો: $_userReferralCode\nડાઉનલોડ લિંક: https://example.com/app',
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: () {
+                Share.share('Watch & Earn Pro એપ ડાઉનલોડ કરો અને મારો રેફરલ કોડ વાપરો: $_userReferralCode');
+              },
+              icon: const Icon(Icons.send, color: Colors.black),
+              label: const Text('કોડ શેર કરો', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.amber),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWalletScreen() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.account_balance_wallet, size: 64, color: Colors.amber),
+            const SizedBox(height: 16),
+            Text('તમારી કમાણી: ₹${(_coins / 10).toStringAsFixed(1)}', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            const Text('લઘુત્તમ ઉપાડ: ₹50 (500 Coins)', style: TextStyle(color: Colors.grey)),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: _coins >= 500
+                  ? () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('વિથડ્રોઅલ રિક્વેસ્ટ સબમિટ થઈ!')),
                       );
-                    },
-                    icon: const Icon(Icons.share, color: Colors.black),
-                    label: const Text('WhatsApp પર શેર કરો', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
-                    style: ElevatedButton.styleFrom(backgroundColor: Colors.greenAccent, padding: const EdgeInsets.symmetric(vertical: 14)),
-                  ),
-                ),
-              ],
+                    }
+                  : null,
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.amber),
+              child: const Text('UPI દ્વારા ઉપાડો', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
             ),
-          ),
-          const SizedBox(height: 24),
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: const Color(0xFF1B1C22),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('રેફરલ કોડ છે?', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
-                const SizedBox(height: 6),
-                const Text('મિત્રનો રેફરલ કોડ દાખલ કરો અને તરત જ ૫૦ કોઈન્સ મેળવો:', style: TextStyle(fontSize: 12, color: Colors.grey)),
-                const SizedBox(height: 14),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: refController,
-                        textCapitalization: TextCapitalization.characters,
-                        style: const TextStyle(color: Colors.white),
-                        decoration: InputDecoration(
-                          hintText: 'દા.ત. PRO12345',
-                          hintStyle: const TextStyle(color: Colors.grey),
-                          filled: true,
-                          fillColor: const Color(0xFF14151B),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    ElevatedButton(
-                      onPressed: _hasUsedReferral ? null : () => _applyReferralCode(refController.text),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.amber,
-                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                      child: Text(_hasUsedReferral ? 'વપરાઈ ગયું' : 'Apply', style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildWalletView() {
-    final upiCtrl = TextEditingController();
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: const Color(0xFF1B1C22),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('UPI વિડ્રોઅલ', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
-                const SizedBox(height: 6),
-                const Text('નિયમ: ૧૦૦ Coins = ₹૧૦ (ઓછામાં ઓછા ૧૦૦ કોઈન્સ)', style: TextStyle(color: Colors.grey, fontSize: 13)),
-                const SizedBox(height: 18),
-                TextField(
-                  controller: upiCtrl,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: InputDecoration(
-                    hintText: 'તમારો UPI ID (દા.ત. user@okaxis)',
-                    hintStyle: const TextStyle(color: Colors.grey),
-                    filled: true,
-                    fillColor: const Color(0xFF14151B),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                SizedBox(
-                  width: double.infinity,
-                  height: 50,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      if (_coins < 100) {
-                        _showMessage('વિડ્રોઅલ માટે ઓછામાં ઓછા ૧૦૦ કોઈન્સ જરૂરી છે!');
-                      } else if (upiCtrl.text.trim().isEmpty) {
-                        _showMessage('કૃપા કરીને સાચો UPI ID દાખલ કરો.');
-                      } else {
-                        setState(() => _coins -= 100);
-                        _showMessage('વિડ્રોઅલ રિક્વેસ્ટ સફળતાપૂર્વક સબમિટ થઈ ગઈ!');
-                        _showInterstitialAd();
-                      }
-                    },
-                    style: ElevatedButton.styleFrom(backgroundColor: Colors.amber, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
-                    child: const Text('પૈસા ઉપાડો (Withdraw)', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 15)),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
