@@ -28,7 +28,7 @@ jobs:
         run: |
           flutter create --org com.watchearn.app --project-name watchearnapp .
 
-      - name: Set clean AndroidManifest
+      - name: Write clean AndroidManifest
         run: |
           cat << 'EOF' > android/app/src/main/AndroidManifest.xml
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
@@ -65,14 +65,51 @@ jobs:
           </manifest>
           EOF
 
-      - name: Force minSdkVersion 23 in Gradle
+      - name: Write build.gradle with minSdkVersion 23
         run: |
-          # Replace both flutter.minSdkVersion and numeric values directly in build.gradle
-          sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 23/g' android/app/build.gradle || true
-          sed -i 's/minSdkVersion = flutter.minSdkVersion/minSdkVersion = 23/g' android/app/build.gradle || true
-          sed -i 's/minSdkVersion 21/minSdkVersion 23/g' android/app/build.gradle || true
-          sed -i 's/minSdkVersion = 21/minSdkVersion = 23/g' android/app/build.gradle || true
-          sed -i 's/defaultConfig {/defaultConfig {\n        minSdkVersion 23/g' android/app/build.gradle || true
+          cat << 'EOF' > android/app/build.gradle
+          plugins {
+              id "com.android.application"
+              id "kotlin-android"
+              id "dev.flutter.flutter-gradle-plugin"
+          }
+
+          android {
+              namespace = "com.watchearn.app.watchearnapp"
+              compileSdk = 34
+              ndkVersion = flutter.ndkVersion
+
+              compileOptions {
+                  sourceCompatibility = JavaVersion.VERSION_1_8
+                  targetCompatibility = JavaVersion.VERSION_1_8
+              }
+
+              kotlinOptions {
+                  jvmTarget = "1.8"
+              }
+
+              defaultConfig {
+                  applicationId = "com.watchearn.app.watchearnapp"
+                  minSdk = 23
+                  targetSdk = 34
+                  versionCode = flutter.versionCode
+                  versionName = flutter.versionName
+                  multiDexEnabled = true
+              }
+
+              buildTypes {
+                  release {
+                      signingConfig = signingConfigs.debug
+                      minifyEnabled false
+                      shrinkResources false
+                  }
+              }
+          }
+
+          flutter {
+              source = "../.."
+          }
+          EOF
 
       - name: Install dependencies
         run: flutter pub get
