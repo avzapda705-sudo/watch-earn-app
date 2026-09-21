@@ -28,6 +28,11 @@ jobs:
         run: |
           flutter create --org com.watchearn.app --project-name watchearnapp .
 
+      - name: Fix Android Namespace and Package
+        run: |
+          sed -i 's/package="com.example.watchearnapp"//g' android/app/src/main/AndroidManifest.xml || true
+          sed -i 's/package="com.watchearn.app.watchearnapp"//g' android/app/src/main/AndroidManifest.xml || true
+
       - name: Configure Android SDK versions
         run: |
           sed -i 's/minSdkVersion = .*/minSdkVersion = 23/' android/app/build.gradle || true
