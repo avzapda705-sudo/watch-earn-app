@@ -488,7 +488,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 );
               }
             },
-          )
+          ),
         ],
       ),
       body: SingleChildScrollView(
@@ -551,7 +551,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       '100 Coins = 10 INR',
                       style: TextStyle(color: Colors.white, fontSize: 12),
                     ),
-                  )
+                  ),
                 ],
               ),
             ),
@@ -580,4 +580,4 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: Text(_claimedDailyBonus ? 'Claimed' : 'Claim'),
                 ),
               ),
-      
+    
