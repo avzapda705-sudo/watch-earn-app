@@ -65,10 +65,14 @@ jobs:
           </manifest>
           EOF
 
-      - name: Configure Android SDK versions
+      - name: Force minSdkVersion 23 in Gradle
         run: |
-          sed -i 's/minSdkVersion = .*/minSdkVersion = 23/' android/app/build.gradle || true
-          sed -i 's/minSdkVersion .*/minSdkVersion 23/' android/app/build.gradle || true
+          # Replace both flutter.minSdkVersion and numeric values directly in build.gradle
+          sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 23/g' android/app/build.gradle || true
+          sed -i 's/minSdkVersion = flutter.minSdkVersion/minSdkVersion = 23/g' android/app/build.gradle || true
+          sed -i 's/minSdkVersion 21/minSdkVersion 23/g' android/app/build.gradle || true
+          sed -i 's/minSdkVersion = 21/minSdkVersion = 23/g' android/app/build.gradle || true
+          sed -i 's/defaultConfig {/defaultConfig {\n        minSdkVersion 23/g' android/app/build.gradle || true
 
       - name: Install dependencies
         run: flutter pub get
