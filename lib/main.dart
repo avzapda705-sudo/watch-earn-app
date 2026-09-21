@@ -1,7 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
-void main() {
+bool isFirebaseReady = false;
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  try {
+    await Firebase.initializeApp();
+    await FirebaseAuth.instance.signInAnonymously();
+    isFirebaseReady = true;
+  } catch (e) {
+    isFirebaseReady = false;
+    debugPrint("Firebase init: $e");
+  }
   runApp(const WatchAndEarnApp());
 }
 
@@ -37,9 +51,69 @@ class _HomeScreenState extends State<HomeScreen> {
   final String _myReferralCode = 'EARN705';
   static const int minWithdraw = 100;
   final List<Map<String, dynamic>> _history = [];
+  String? _userId;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadOnlineData();
+  }
+
+  void _loadOnlineData() async {
+    if (!isFirebaseReady) return;
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        _userId = user.uid;
+        final doc = await FirebaseFirestore.instance.collection('users').doc(_userId).get();
+        if (doc.exists && doc.data() != null) {
+          final data = doc.data()!;
+          setState(() {
+            _balance = data['balance'] ?? 0;
+            _claimedDaily = data['claimedDaily'] ?? false;
+            _appliedReferral = data['appliedReferral'] ?? false;
+          });
+        } else {
+          await FirebaseFirestore.instance.collection('users').doc(_userId).set({
+            'balance': 0,
+            'claimedDaily': false,
+            'appliedReferral': false,
+            'createdAt': FieldValue.serverTimestamp(),
+          });
+        }
+
+        final historySnap = await FirebaseFirestore.instance
+            .collection('withdrawals')
+            .where('userId', isEqualTo: _userId)
+            .get();
+
+        setState(() {
+          _history.clear();
+          for (var item in historySnap.docs) {
+            _history.add({
+              'coins': item['coins'],
+              'upi': item['upiId'],
+              'status': item['status'] ?? 'Pending',
+            });
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint("Data load error: $e");
+    }
+  }
+
+  void _syncUserBalance(int newBalance) {
+    if (isFirebaseReady && _userId != null) {
+      FirebaseFirestore.instance.collection('users').doc(_userId).update({
+        'balance': newBalance,
+      }).catchError((e) => debugPrint("Sync error: $e"));
+    }
+  }
 
   void _watchVideo() {
     setState(() => _balance += 10);
+    _syncUserBalance(_balance);
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('🎉 +10 Coins earned!'),
@@ -59,6 +133,12 @@ class _HomeScreenState extends State<HomeScreen> {
       _balance += 25;
       _claimedDaily = true;
     });
+    if (isFirebaseReady && _userId != null) {
+      FirebaseFirestore.instance.collection('users').doc(_userId).update({
+        'balance': _balance,
+        'claimedDaily': true,
+      }).catchError((e) => debugPrint("Daily error: $e"));
+    }
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('🎁 Daily Bonus: +25 Coins added!'),
@@ -159,6 +239,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 _balance += 50;
                 _appliedReferral = true;
               });
+              if (isFirebaseReady && _userId != null) {
+                FirebaseFirestore.instance.collection('users').doc(_userId).update({
+                  'balance': _balance,
+                  'appliedReferral': true,
+                }).catchError((e) => debugPrint("Ref error: $e"));
+              }
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
                   content: Text('🌟 Referral Bonus Applied! +50 Coins!'),
@@ -203,7 +289,7 @@ class _HomeScreenState extends State<HomeScreen> {
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
-            onPressed: () {
+            onPressed: () async {
               final upi = upiCtrl.text.trim();
               final coins = int.tryParse(coinCtrl.text.trim()) ?? 0;
 
@@ -226,6 +312,27 @@ class _HomeScreenState extends State<HomeScreen> {
                 _balance -= coins;
                 _history.insert(0, {'coins': coins, 'upi': upi, 'status': 'Pending'});
               });
+
+              if (isFirebaseReady && _userId != null) {
+                try {
+                  final batch = FirebaseFirestore.instance.batch();
+                  final userDoc = FirebaseFirestore.instance.collection('users').doc(_userId);
+                  final withdrawDoc = FirebaseFirestore.instance.collection('withdrawals').doc();
+
+                  batch.update(userDoc, {'balance': _balance});
+                  batch.set(withdrawDoc, {
+                    'userId': _userId,
+                    'upiId': upi,
+                    'coins': coins,
+                    'status': 'Pending',
+                    'timestamp': FieldValue.serverTimestamp(),
+                  });
+                  await batch.commit();
+                } catch (e) {
+                  debugPrint("Withdraw save error: $e");
+                }
+              }
+
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('Withdrawal request submitted!'), backgroundColor: Colors.green),
               );
