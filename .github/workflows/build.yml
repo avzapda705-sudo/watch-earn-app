@@ -23,6 +23,24 @@ jobs:
           flutter-version: '3.24.5'
           channel: 'stable'
 
+      - name: Create complete Flutter structure
+        run: |
+          if [ ! -f "android/build.gradle" ]; then
+            flutter create --project-name watchearnapp --org com.example . --platforms=android
+          fi
+
+      - name: Configure AdMob App ID
+        run: |
+          if ! grep -q "com.google.android.gms.ads.APPLICATION_ID" android/app/src/main/AndroidManifest.xml; then
+            sed -i '/<\/application>/i \        <meta-data android:name="com.google.android.gms.ads.APPLICATION_ID" android:value="ca-app-pub-5150845800087406~4000485952"/>' android/app/src/main/AndroidManifest.xml
+          fi
+
+      - name: Configure Android SDK versions
+        run: |
+          sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 21/g' android/app/build.gradle || true
+          sed -i 's/minSdkVersion = flutter.minSdkVersion/minSdkVersion = 21/g' android/app/build.gradle || true
+          sed -i 's/minSdkVersion 19/minSdkVersion 21/g' android/app/build.gradle || true
+
       - name: Install dependencies
         run: flutter pub get
 
