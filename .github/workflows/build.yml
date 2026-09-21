@@ -29,6 +29,10 @@ jobs:
             flutter create --project-name watchearnapp --org com.example . --platforms=android
           fi
 
+      - name: Configure AdMob App ID
+        run: |
+          sed -i '/<\/application>/i \        <meta-data android:name="com.google.android.gms.ads.APPLICATION_ID" android:value="ca-app-pub-5150845800087406~4000485952"/>' android/app/src/main/AndroidManifest.xml
+
       - name: Configure Android SDK versions
         run: |
           sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 21/g' android/app/build.gradle || true
