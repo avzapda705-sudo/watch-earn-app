@@ -13,7 +13,7 @@ void main() async {
     isFirebaseReady = true;
   } catch (e) {
     isFirebaseReady = false;
-    debugPrint("Firebase connection note: $e");
+    debugPrint("Firebase init note: $e");
   }
 
   runApp(const WatchAndEarnApp());
@@ -297,13 +297,13 @@ class _HomeScreenState extends State<HomeScreen> {
   static const int minWithdrawLimit = 100;
   final List<Map<String, dynamic>> _localWithdrawals = [];
 
-  void _addRewardCoins() async {
+  void _addRewardCoins() {
     if (isFirebaseReady && widget.user != null) {
       try {
         final userDoc = FirebaseFirestore.instance
             .collection('users')
             .doc(widget.user!.uid);
-        await userDoc.update({'balance': FieldValue.increment(10)});
+        userDoc.update({'balance': FieldValue.increment(10)});
       } catch (e) {
         debugPrint("Error updating balance: $e");
       }
@@ -315,7 +315,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('🎉 Congratulations! +10 Coins credited!'),
+        content: Text('Congratulations! +10 Coins credited!'),
         backgroundColor: Colors.green,
       ),
     );
@@ -324,7 +324,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void _claimDailyReward() {
     if (_claimedDailyBonus) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('You have already claimed today\'s bonus!')),
+        const SnackBar(content: Text('You have already claimed today bonus!')),
       );
       return;
     }
@@ -336,7 +336,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('🎁 Daily Bonus: +25 Coins added to your account!'),
+        content: Text('Daily Bonus: +25 Coins added to your account!'),
         backgroundColor: Colors.orange,
       ),
     );
@@ -362,7 +362,7 @@ class _HomeScreenState extends State<HomeScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              '⚠️ Minimum withdrawal: $minWithdrawLimit Coins',
+              'Minimum withdrawal: $minWithdrawLimit Coins',
               style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
             ),
             const SizedBox(height: 16),
@@ -502,7 +502,6 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // --- Wallet Card ---
             Container(
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
@@ -555,17 +554,14 @@ class _HomeScreenState extends State<HomeScreen> {
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: const Text(
-                      '100 Coins = ₹10',
+                      '100 Coins = 10 INR',
                       style: TextStyle(color: Colors.white, fontSize: 12),
                     ),
                   )
                 ],
               ),
             ),
-
             const SizedBox(height: 18),
-
-            // --- Daily Bonus Card ---
             Card(
               elevation: 0,
               color: Colors.amber.shade50,
@@ -585,4 +581,5 @@ class _HomeScreenState extends State<HomeScreen> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.amber.shade700,
                     foregroundColor: Colors.white,
-      
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  
