@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "439232410952",
+    "project_id": "watch-earn-app-3293e",
+    "storage_bucket": "watch-earn-app-3293e.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:439232410952:android:4c970b28d4982ddfa66f7d",
+        "android_client_info": {
+          "package_name": "com.example.watchearnapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD-kDV9zTGLNjg_0hzTkAT45T4eJFK-Bxs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
