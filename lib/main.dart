@@ -1,391 +1,392 @@
-import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:google_mobile_ads/google_mobile_ads.dart';
-import 'package:share_plus/share_plus.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await MobileAds.instance.initialize();
-  runApp(const MyApp());
+  await Firebase.initializeApp();
+  runApp(const WatchAndEarnApp());
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+class WatchAndEarnApp extends StatelessWidget {
+  const WatchAndEarnApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Watch & Earn Pro',
+      title: 'Watch & Earn',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        brightness: Brightness.dark,
-        primarySwatch: Colors.amber,
-        scaffoldBackgroundColor: const Color(0xFF121212),
-        cardColor: const Color(0xFF1E1E1E),
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
       ),
-      home: const MainNavigationScreen(),
+      home: StreamBuilder<User?>(
+        stream: FirebaseAuth.instance.authStateChanges(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            );
+          }
+          if (snapshot.hasData && snapshot.data != null) {
+            return HomeScreen(user: snapshot.data!);
+          }
+          return const LoginScreen();
+        },
+      ),
     );
   }
 }
 
-class MainNavigationScreen extends StatefulWidget {
-  const MainNavigationScreen({super.key});
+// ---------------- LOGIN SCREEN (PHONE OTP) ----------------
+class LoginScreen extends StatefulWidget {
+  const LoginScreen({super.key});
 
   @override
-  State<MainNavigationScreen> createState() => _MainNavigationScreenState();
+  State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _MainNavigationScreenState extends State<MainNavigationScreen> {
-  int _currentIndex = 0;
-  int _coins = 100;
-  int _adsRemaining = 15;
-  bool _claimedDaily = false;
-  bool _hasUsedReferral = false;
-  late final String _userReferralCode;
+class _LoginScreenState extends State<LoginScreen> {
+  final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _otpController = TextEditingController();
 
-  // AdMob IDs
-  final String _rewardedAdUnitId = "ca-app-pub-3940256099942544/5224354917";
-  final String _interstitialAdUnitId = "ca-app-pub-5150845800087406/1723070460";
-  final String _bannerAdUnitId = "ca-app-pub-5150845800087406/8334333520";
+  String? _verificationId;
+  bool _isOtpSent = false;
+  bool _isLoading = false;
 
-  RewardedAd? _rewardedAd;
-  InterstitialAd? _interstitialAd;
-  BannerAd? _bannerAd;
-  bool _isBannerLoaded = false;
-  bool _isLoadingReward = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _userReferralCode = "PRO${Random().nextInt(899999) + 100000}";
-    _loadBannerAd();
-    _loadInterstitialAd();
-    _loadRewardedAd();
-  }
-
-  void _loadBannerAd() {
-    _bannerAd = BannerAd(
-      adUnitId: _bannerAdUnitId,
-      size: AdSize.banner,
-      request: const AdRequest(),
-      listener: BannerAdListener(
-        onAdLoaded: (ad) => setState(() => _isBannerLoaded = true),
-        onAdFailedToLoad: (ad, error) {
-          ad.dispose();
-        },
-      ),
-    )..load();
-  }
-
-  void _loadInterstitialAd() {
-    InterstitialAd.load(
-      adUnitId: _interstitialAdUnitId,
-      request: const AdRequest(),
-      adLoadCallback: InterstitialAdLoadCallback(
-        onAdLoaded: (ad) {
-          _interstitialAd = ad;
-        },
-        onAdFailedToLoad: (error) {
-          _interstitialAd = null;
-        },
-      ),
-    );
-  }
-
-  void _loadRewardedAd() {
-    RewardedAd.load(
-      adUnitId: _rewardedAdUnitId,
-      request: const AdRequest(),
-      rewardedAdLoadCallback: RewardedAdLoadCallback(
-        onAdLoaded: (ad) {
-          setState(() {
-            _rewardedAd = ad;
-            _isLoadingReward = false;
-          });
-        },
-        onAdFailedToLoad: (error) {
-          setState(() {
-            _rewardedAd = null;
-            _isLoadingReward = false;
-          });
-        },
-      ),
-    );
-  }
-
-  void _showRewardedAd() {
-    if (_adsRemaining <= 0) {
+  void _sendOtp() async {
+    final phone = _phoneController.text.trim();
+    if (phone.isEmpty || phone.length < 10) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('આજના એડ્સ પૂરા થઈ ગયા છે!')),
+        const SnackBar(content: Text('કૃપા કરીને માન્ય 10 અંકનો નંબર દાખલ કરો')),
       );
       return;
     }
 
-    if (_rewardedAd != null) {
-      _rewardedAd!.fullScreenContentCallback = FullScreenContentCallback(
-        onAdDismissedFullScreenContent: (ad) {
-          ad.dispose();
-          _loadRewardedAd();
-        },
-        onAdFailedToShowFullScreenContent: (ad, error) {
-          ad.dispose();
-          _loadRewardedAd();
-        },
-      );
+    setState(() => _isLoading = true);
 
-      _rewardedAd!.show(
-        onUserEarnedReward: (AdWithoutView ad, RewardItem reward) {
-          setState(() {
-            _coins += 10;
-            _adsRemaining--;
+    await FirebaseAuth.instance.verifyPhoneNumber(
+      phoneNumber: '+91$phone',
+      verificationCompleted: (PhoneAuthCredential credential) async {
+        await FirebaseAuth.instance.signInWithCredential(credential);
+      },
+      verificationFailed: (FirebaseAuthException e) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('વેરિફિકેશન નિષ્ફળ: ${e.message}')),
+        );
+      },
+      codeSent: (String verificationId, int? resendToken) {
+        setState(() {
+          _verificationId = verificationId;
+          _isOtpSent = true;
+          _isLoading = false;
+        });
+      },
+      codeAutoRetrievalTimeout: (String verificationId) {
+        _verificationId = verificationId;
+      },
+    );
+  }
+
+  void _verifyOtp() async {
+    final otp = _otpController.text.trim();
+    if (otp.length != 6 || _verificationId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('કૃપા કરીને 6 અંકનો OTP દાખલ કરો')),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      PhoneAuthCredential credential = PhoneAuthProvider.credential(
+        verificationId: _verificationId!,
+        smsCode: otp,
+      );
+      UserCredential userCred =
+          await FirebaseAuth.instance.signInWithCredential(credential);
+
+      // Initialize Firestore document for new user
+      if (userCred.user != null) {
+        final userDoc = FirebaseFirestore.instance
+            .collection('users')
+            .doc(userCred.user!.uid);
+
+        final docSnapshot = await userDoc.get();
+        if (!docSnapshot.exists) {
+          await userDoc.set({
+            'phone': userCred.user!.phoneNumber,
+            'balance': 0,
+            'createdAt': FieldValue.serverTimestamp(),
           });
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('+10 Coins જમા થયા!')),
-          );
-        },
-      );
-      _rewardedAd = null;
-    } else {
-      setState(() => _isLoadingReward = true);
-      _loadRewardedAd();
+        }
+      }
+    } catch (e) {
+      setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('એડ લોડ થઈ રહી છે, ફરી પ્રયત્ન કરો.')),
+        SnackBar(content: Text('OTP અમાન્ય છે: $e')),
       );
     }
-  }
-
-  void _claimDailyBonus() {
-    if (!_claimedDaily) {
-      setState(() {
-        _coins += 25;
-        _claimedDaily = true;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('+25 Coins ડેઇલી બોનસ મળ્યું!')),
-      );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('આજનું બોનસ પહેલેથી લઈ લીધું છે!')),
-      );
-    }
-  }
-
-  @override
-  void dispose() {
-    _bannerAd?.dispose();
-    _interstitialAd?.dispose();
-    _rewardedAd?.dispose();
-    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Watch & Earn Pro', style: TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.black,
+      appBar: AppBar(title: const Text('Login / રજીસ્ટ્રેશન')),
+      body: Padding(
+        padding: const EdgeInsets.all(20.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.monetization_on, size: 80, color: Colors.deepPurple),
+            const SizedBox(height: 20),
+            if (!_isOtpSent) ...[
+              TextField(
+                controller: _phoneController,
+                keyboardType: TextInputType.phone,
+                maxLength: 10,
+                decoration: const InputDecoration(
+                  prefixText: '+91 ',
+                  labelText: 'મોબાઈલ નંબર',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 16),
+              _isLoading
+                  ? const CircularProgressIndicator()
+                  : ElevatedButton(
+                      onPressed: _sendOtp,
+                      child: const Text('OTP મોકલો'),
+                    ),
+            ] else ...[
+              TextField(
+                controller: _otpController,
+                keyboardType: TextInputType.number,
+                maxLength: 6,
+                decoration: const InputDecoration(
+                  labelText: '૬ અંકનો OTP દાખલ કરો',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 16),
+              _isLoading
+                  ? const CircularProgressIndicator()
+                  : ElevatedButton(
+                      onPressed: _verifyOtp,
+                      child: const Text('OTP વેરિફાય કરો'),
+                    ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------- HOME SCREEN ----------------
+class HomeScreen extends StatelessWidget {
+  final User user;
+  const HomeScreen({super.key, required this.user});
+
+  void _addRewardCoins(BuildContext context) async {
+    final userDoc =
+        FirebaseFirestore.instance.collection('users').doc(user.uid);
+    await userDoc.update({'balance': FieldValue.increment(10)});
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('+10 સિક્કા મળ્યા!')),
+    );
+  }
+
+  void _showWithdrawDialog(BuildContext context, int currentBalance) {
+    final TextEditingController upiController = TextEditingController();
+    final TextEditingController coinsController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('ઉપાડ (Withdrawal) રિક્વેસ્ટ'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: upiController,
+              decoration: const InputDecoration(labelText: 'UPI ID દાખલ કરો'),
+            ),
+            TextField(
+              controller: coinsController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: 'સિક્કા (Coins) દાખલ કરો'),
+            ),
+          ],
+        ),
         actions: [
-          Container(
-            margin: const EdgeInsets.only(right: 16),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: Colors.amber.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: Colors.amber),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.monetization_on, color: Colors.amber, size: 20),
-                const SizedBox(width: 6),
-                Text('$_coins', style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.bold)),
-              ],
-            ),
-          )
-        ],
-      ),
-      body: Column(
-        children: [
-          Expanded(
-            child: IndexedStack(
-              index: _currentIndex,
-              children: [
-                _buildHomeScreen(),
-                _buildReferScreen(),
-                _buildWalletScreen(),
-              ],
-            ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('રદ કરો'),
           ),
-          if (_isBannerLoaded && _bannerAd != null)
-            SizedBox(
-              width: _bannerAd!.size.width.toDouble(),
-              height: _bannerAd!.size.height.toDouble(),
-              child: AdWidget(ad: _bannerAd!),
-            ),
-        ],
-      ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _currentIndex,
-        onDestinationSelected: (index) => setState(() => _currentIndex = index),
-        destinations: const [
-          NavigationDestination(icon: Icon(Icons.home), label: 'Home'),
-          NavigationDestination(icon: Icon(Icons.card_giftcard), label: 'Refer & Earn'),
-          NavigationDestination(icon: Icon(Icons.account_balance_wallet), label: 'Wallet'),
+          ElevatedButton(
+            onPressed: () async {
+              final upi = upiController.text.trim();
+              final coins = int.tryParse(coinsController.text.trim()) ?? 0;
+
+              if (upi.isEmpty || coins <= 0) return;
+              if (coins > currentBalance) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('ખાતામાં પૂરતું બેલેન્સ નથી!')),
+                );
+                return;
+              }
+
+              Navigator.pop(ctx);
+
+              // Deduct coins & create withdrawal record
+              final batch = FirebaseFirestore.instance.batch();
+              final userDoc = FirebaseFirestore.instance.collection('users').doc(user.uid);
+              final withdrawDoc = FirebaseFirestore.instance.collection('withdrawals').doc();
+
+              batch.update(userDoc, {'balance': FieldValue.increment(-coins)});
+              batch.set(withdrawDoc, {
+                'userId': user.uid,
+                'phone': user.phoneNumber,
+                'upiId': upi,
+                'coins': coins,
+                'status': 'Pending',
+                'timestamp': FieldValue.serverTimestamp(),
+              });
+
+              await batch.commit();
+
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('રિક્વેસ્ટ સફળતાપૂર્વક સબમિટ થઈ ગઈ!')),
+              );
+            },
+            child: const Text('સબમિટ કરો'),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildHomeScreen() {
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        children: [
-          Card(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            child: Padding(
-              padding: const EdgeInsets.all(20.0),
-              child: Column(
-                children: [
-                  const Icon(Icons.star, color: Colors.amber, size: 48),
-                  const SizedBox(height: 8),
-                  const Text('કુલ બેલેન્સ', style: TextStyle(color: Colors.grey)),
-                  const SizedBox(height: 4),
-                  Text('$_coins Coins', style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.amber)),
-                  const SizedBox(height: 4),
-                  Text('લગભગ ₹${(_coins / 10).toStringAsFixed(1)} બરાબર', style: const TextStyle(color: Colors.greenAccent)),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: Card(
+  @override
+  Widget build(BuildContext context) {
+    final userDoc =
+        FirebaseFirestore.instance.collection('users').doc(user.uid);
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Watch & Earn'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: () => FirebaseAuth.instance.signOut(),
+          )
+        ],
+      ),
+      body: StreamBuilder<DocumentSnapshot>(
+        stream: userDoc.snapshots(),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          final data = snapshot.data?.data() as Map<String, dynamic>? ?? {};
+          final balance = data['balance'] ?? 0;
+
+          return Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Card(
+                  elevation: 4,
                   child: Padding(
-                    padding: const EdgeInsets.all(16.0),
+                    padding: const EdgeInsets.all(20.0),
                     child: Column(
                       children: [
-                        const Text('બાકી એડ્સ', style: TextStyle(color: Colors.grey)),
+                        const Text('તમારું બેલેન્સ', style: TextStyle(fontSize: 18)),
                         const SizedBox(height: 8),
-                        Text('$_adsRemaining / 15', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.amber)),
+                        Text(
+                          '$balance સિક્કા',
+                          style: const TextStyle(
+                              fontSize: 32,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.deepPurple),
+                        ),
                       ],
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Card(
-                  child: InkWell(
-                    onTap: _claimDailyBonus,
-                    borderRadius: BorderRadius.circular(12),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Column(
-                        children: [
-                          const Text('ડેઇલી બોનસ', style: TextStyle(color: Colors.grey)),
-                          const SizedBox(height: 8),
-                          Text(_claimedDaily ? 'મેળવી લીધું' : '+25 મેળવો', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.greenAccent)),
-                        ],
-                      ),
-                    ),
+                const SizedBox(height: 20),
+                ElevatedButton.icon(
+                  onPressed: () => _addRewardCoins(context),
+                  icon: const Icon(Icons.play_circle_fill),
+                  label: const Text('વીડિયો જુઓ (+10 સિક્કા)'),
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-          SizedBox(
-            width: double.infinity,
-            height: 54,
-            child: ElevatedButton.icon(
-              onPressed: _isLoadingReward ? null : _showRewardedAd,
-              icon: _isLoadingReward
-                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
-                  : const Icon(Icons.play_circle_fill, color: Colors.black),
-              label: Text(
-                _isLoadingReward ? 'લોડ થઈ રહી છે...' : 'વિડિયો જુઓ અને કમાઓ (+10 Coins)',
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.amber,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildReferScreen() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.share, size: 64, color: Colors.amber),
-            const SizedBox(height: 16),
-            const Text('મિત્રોને ઇન્વાઇટ કરો', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            const Text('દરેક રેફરલ પર મેળવો 50 કોઈન્સ!', style: TextStyle(color: Colors.grey)),
-            const SizedBox(height: 24),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.amber, style: BorderStyle.solid),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: SelectableText(
-                _userReferralCode,
-                style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, letterSpacing: 2, color: Colors.amber),
-              ),
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton.icon(
-              onPressed: () {
-                Share.share('Watch & Earn Pro એપ ડાઉનલોડ કરો અને મારો રેફરલ કોડ વાપરો: $_userReferralCode');
-              },
-              icon: const Icon(Icons.send, color: Colors.black),
-              label: const Text('કોડ શેર કરો', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.amber),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildWalletScreen() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.account_balance_wallet, size: 64, color: Colors.amber),
-            const SizedBox(height: 16),
-            Text('તમારી કમાણી: ₹${(_coins / 10).toStringAsFixed(1)}', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            const Text('લઘુત્તમ ઉપાડ: ₹50 (500 Coins)', style: TextStyle(color: Colors.grey)),
-            const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: _coins >= 500
-                  ? () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('વિથડ્રોઅલ રિક્વેસ્ટ સબમિટ થઈ!')),
+                const SizedBox(height: 12),
+                ElevatedButton.icon(
+                  onPressed: () => _showWithdrawDialog(context, balance),
+                  icon: const Icon(Icons.account_balance_wallet),
+                  label: const Text('પૈસા ઉપાડો (Withdraw)'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                const Text(
+                  'તમારો ઉપાડ ઇતિહાસ (Withdrawal History)',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                const Divider(),
+                Expanded(
+                  child: StreamBuilder<QuerySnapshot>(
+                    stream: FirebaseFirestore.instance
+                        .collection('withdrawals')
+                        .where('userId', isEqualTo: user.uid)
+                        .snapshots(),
+                    builder: (context, withdrawSnapshot) {
+                      if (!withdrawSnapshot.hasData) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
+                      final docs = withdrawSnapshot.data!.docs;
+                      if (docs.isEmpty) {
+                        return const Center(child: Text('કોઈ રેકોર્ડ ઉપલબ્ધ નથી'));
+                      }
+                      return ListView.builder(
+                        itemCount: docs.length,
+                        itemBuilder: (context, index) {
+                          final item =
+                              docs[index].data() as Map<String, dynamic>;
+                          return Card(
+                            child: ListTile(
+                              leading: const Icon(Icons.history),
+                              title: Text('${item['coins']} સિક્કા'),
+                              subtitle: Text('UPI: ${item['upiId']}'),
+                              trailing: Chip(
+                                label: Text(item['status'] ?? 'Pending'),
+                                backgroundColor: item['status'] == 'Approved'
+                                    ? Colors.green.shade100
+                                    : Colors.orange.shade100,
+                              ),
+                            ),
+                          );
+                        },
                       );
-                    }
-                  : null,
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.amber),
-              child: const Text('UPI દ્વારા ઉપાડો', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+                    },
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
