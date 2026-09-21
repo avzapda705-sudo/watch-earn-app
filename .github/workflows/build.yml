@@ -20,21 +20,19 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.19.6'
           channel: 'stable'
 
       - name: Create complete Flutter structure
         run: |
-          mkdir -p temp_app
-          cd temp_app
-          flutter create --org com.example watchearnapp
-          cp -r watchearnapp/android ../
-          cd ..
-          rm -rf temp_app
+          if [ ! -f "android/build.gradle" ]; then
+            flutter create --org com.example . --platforms=android
+          fi
 
-      - name: Update AndroidManifest for Internet
+      - name: Set minSdkVersion to 21
         run: |
-          sed -i '/<application/i <uses-permission android:name="android.permission.INTERNET"/>\n<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>' android/app/src/main/AndroidManifest.xml
+          sed -i 's/minSdkVersion = flutter.minSdkVersion/minSdkVersion = 21/g' android/app/build.gradle || true
+          sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 21/g' android/app/build.gradle || true
+          sed -i 's/minSdkVersion 19/minSdkVersion 21/g' android/app/build.gradle || true
 
       - name: Install dependencies
         run: flutter pub get
@@ -47,4 +45,3 @@ jobs:
         with:
           name: app-release
           path: build/app/outputs/flutter-apk/app-release.apk
-          
