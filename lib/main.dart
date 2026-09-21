@@ -8,7 +8,6 @@ bool isFirebaseReady = false;
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Safely initialize Firebase without crashing the UI
   try {
     await Firebase.initializeApp();
     isFirebaseReady = true;
@@ -29,8 +28,9 @@ class WatchAndEarnApp extends StatelessWidget {
       title: 'Watch & Earn',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
+        colorSchemeSeed: Colors.deepPurple,
+        scaffoldBackgroundColor: const Color(0xFFF7F8FA),
       ),
       home: isFirebaseReady
           ? StreamBuilder<User?>(
@@ -52,7 +52,7 @@ class WatchAndEarnApp extends StatelessWidget {
   }
 }
 
-// ---------------- LOGIN SCREEN (PHONE OTP) ----------------
+// ---------------- LOGIN SCREEN ----------------
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -72,18 +72,15 @@ class _LoginScreenState extends State<LoginScreen> {
     final phone = _phoneController.text.trim();
     if (phone.isEmpty || phone.length < 10) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('કૃપા કરીને માન્ય 10 અંકનો નંબર દાખલ કરો')),
+        const SnackBar(content: Text('Please enter a valid 10-digit mobile number')),
       );
       return;
     }
 
     if (!isFirebaseReady) {
-      // Offline fallback demo mode
-      setState(() {
-        _isOtpSent = true;
-      });
+      setState(() => _isOtpSent = true);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('OTP મોકલવામાં આવ્યો છે (ડેમો મોડ: 123456)')),
+        const SnackBar(content: Text('OTP sent successfully! (Demo Mode: 123456)')),
       );
       return;
     }
@@ -99,7 +96,7 @@ class _LoginScreenState extends State<LoginScreen> {
         verificationFailed: (FirebaseAuthException e) {
           setState(() => _isLoading = false);
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('વેરિફિકેશન નિષ્ફળ: ${e.message}')),
+            SnackBar(content: Text('Verification failed: ${e.message}')),
           );
         },
         codeSent: (String verificationId, int? resendToken) {
@@ -116,7 +113,7 @@ class _LoginScreenState extends State<LoginScreen> {
     } catch (e) {
       setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('એરર: $e')),
+        SnackBar(content: Text('Error: $e')),
       );
     }
   }
@@ -125,7 +122,7 @@ class _LoginScreenState extends State<LoginScreen> {
     final otp = _otpController.text.trim();
     if (otp.length != 6) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('કૃપા કરીને 6 અંકનો OTP દાખલ કરો')),
+        const SnackBar(content: Text('Please enter a valid 6-digit OTP')),
       );
       return;
     }
@@ -133,7 +130,6 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isLoading = true);
 
     if (!isFirebaseReady) {
-      // Offline demo login bypass
       setState(() => _isLoading = false);
       Navigator.pushReplacement(
         context,
@@ -168,7 +164,7 @@ class _LoginScreenState extends State<LoginScreen> {
     } catch (e) {
       setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('OTP અમાન્ય છે: $e')),
+        SnackBar(content: Text('Invalid OTP: $e')),
       );
     }
   }
@@ -176,51 +172,110 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Login / રજીસ્ટ્રેશન')),
-      body: Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.monetization_on, size: 80, color: Colors.deepPurple),
-            const SizedBox(height: 20),
-            if (!_isOtpSent) ...[
-              TextField(
-                controller: _phoneController,
-                keyboardType: TextInputType.phone,
-                maxLength: 10,
-                decoration: const InputDecoration(
-                  prefixText: '+91 ',
-                  labelText: 'મોબાઈલ નંબર',
-                  border: OutlineInputBorder(),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 40.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              const SizedBox(height: 30),
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.deepPurple.shade50,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.monetization_on_rounded,
+                  size: 80,
+                  color: Colors.deepPurple,
                 ),
               ),
-              const SizedBox(height: 16),
-              _isLoading
-                  ? const CircularProgressIndicator()
-                  : ElevatedButton(
-                      onPressed: _sendOtp,
-                      child: const Text('OTP મોકલો'),
-                    ),
-            ] else ...[
-              TextField(
-                controller: _otpController,
-                keyboardType: TextInputType.number,
-                maxLength: 6,
-                decoration: const InputDecoration(
-                  labelText: '૬ અંકનો OTP દાખલ કરો',
-                  border: OutlineInputBorder(),
+              const SizedBox(height: 24),
+              const Text(
+                'Watch & Earn',
+                style: TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 0.5,
                 ),
               ),
-              const SizedBox(height: 16),
-              _isLoading
-                  ? const CircularProgressIndicator()
-                  : ElevatedButton(
-                      onPressed: _verifyOtp,
-                      child: const Text('OTP વેરિફાય કરો'),
+              const SizedBox(height: 8),
+              Text(
+                'Watch videos daily and earn real cash rewards',
+                style: TextStyle(color: Colors.grey.shade600, fontSize: 16),
+              ),
+              const SizedBox(height: 40),
+              if (!_isOtpSent) ...[
+                TextField(
+                  controller: _phoneController,
+                  keyboardType: TextInputType.phone,
+                  maxLength: 10,
+                  decoration: InputDecoration(
+                    prefixIcon: const Icon(Icons.phone),
+                    prefixText: '+91 ',
+                    labelText: 'Mobile Number',
+                    filled: true,
+                    fillColor: Colors.white,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
                     ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  height: 52,
+                  child: ElevatedButton(
+                    onPressed: _isLoading ? null : _sendOtp,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.deepPurple,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    child: _isLoading
+                        ? const CircularProgressIndicator(color: Colors.white)
+                        : const Text('Send OTP', style: TextStyle(fontSize: 16)),
+                  ),
+                ),
+              ] else ...[
+                TextField(
+                  controller: _otpController,
+                  keyboardType: TextInputType.number,
+                  maxLength: 6,
+                  decoration: InputDecoration(
+                    prefixIcon: const Icon(Icons.lock_clock),
+                    labelText: 'Enter 6-digit OTP',
+                    filled: true,
+                    fillColor: Colors.white,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  height: 52,
+                  child: ElevatedButton(
+                    onPressed: _isLoading ? null : _verifyOtp,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.deepPurple,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    child: _isLoading
+                        ? const CircularProgressIndicator(color: Colors.white)
+                        : const Text('Verify OTP', style: TextStyle(fontSize: 16)),
+                  ),
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );
@@ -238,6 +293,8 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _localBalance = 0;
+  bool _claimedDailyBonus = false;
+  static const int minWithdrawLimit = 100;
   final List<Map<String, dynamic>> _localWithdrawals = [];
 
   void _addRewardCoins() async {
@@ -257,7 +314,31 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('+10 સિક્કા મળ્યા!')),
+      const SnackBar(
+        content: Text('🎉 Congratulations! +10 Coins credited!'),
+        backgroundColor: Colors.green,
+      ),
+    );
+  }
+
+  void _claimDailyReward() {
+    if (_claimedDailyBonus) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('You have already claimed today\'s bonus!')),
+      );
+      return;
+    }
+
+    setState(() {
+      _localBalance += 25;
+      _claimedDailyBonus = true;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('🎁 Daily Bonus: +25 Coins added to your account!'),
+        backgroundColor: Colors.orange,
+      ),
     );
   }
 
@@ -268,35 +349,76 @@ class _HomeScreenState extends State<HomeScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('ઉપાડ (Withdrawal) રિક્વેસ્ટ'),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.account_balance_wallet, color: Colors.green),
+            SizedBox(width: 8),
+            Text('Withdraw Money'),
+          ],
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Text(
+              '⚠️ Minimum withdrawal: $minWithdrawLimit Coins',
+              style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
+            ),
+            const SizedBox(height: 16),
             TextField(
               controller: upiController,
-              decoration: const InputDecoration(labelText: 'UPI ID દાખલ કરો'),
+              decoration: InputDecoration(
+                prefixIcon: const Icon(Icons.payment),
+                labelText: 'UPI ID (e.g. name@upi)',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              ),
             ),
+            const SizedBox(height: 12),
             TextField(
               controller: coinsController,
               keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: 'સિક્કા દાખલ કરો'),
+              decoration: InputDecoration(
+                prefixIcon: const Icon(Icons.monetization_on),
+                labelText: 'Number of Coins',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              ),
             ),
           ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('રદ કરો'),
+            child: const Text('Cancel'),
           ),
           ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
             onPressed: () async {
               final upi = upiController.text.trim();
               final coins = int.tryParse(coinsController.text.trim()) ?? 0;
 
               if (upi.isEmpty || coins <= 0) return;
+
+              if (coins < minWithdrawLimit) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Minimum withdrawal is 100 Coins!'),
+                    backgroundColor: Colors.redAccent,
+                  ),
+                );
+                return;
+              }
+
               if (coins > currentBalance) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('ખાતામાં પૂરતું બેલેન્સ નથી!')),
+                  const SnackBar(
+                    content: Text('Insufficient balance in your wallet!'),
+                    backgroundColor: Colors.redAccent,
+                  ),
                 );
                 return;
               }
@@ -339,10 +461,13 @@ class _HomeScreenState extends State<HomeScreen> {
               }
 
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('રિક્વેસ્ટ સફળતાપૂર્વક સબમિટ થઈ ગઈ!')),
+                const SnackBar(
+                  content: Text('Withdrawal request submitted successfully!'),
+                  backgroundColor: Colors.green,
+                ),
               );
             },
-            child: const Text('સબમિટ કરો'),
+            child: const Text('Submit'),
           ),
         ],
       ),
@@ -355,7 +480,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Watch & Earn'),
+        title: const Text('Watch & Earn', style: TextStyle(fontWeight: FontWeight.bold)),
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
@@ -372,82 +497,92 @@ class _HomeScreenState extends State<HomeScreen> {
           )
         ],
       ),
-      body: Padding(
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Card(
-              elevation: 4,
-              child: Padding(
-                padding: const EdgeInsets.all(20.0),
-                child: Column(
-                  children: [
-                    const Text('તમારું બેલેન્સ', style: TextStyle(fontSize: 18)),
-                    const SizedBox(height: 8),
-                    Text(
-                      '$balance સિક્કા',
-                      style: const TextStyle(
-                          fontSize: 32,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.deepPurple),
-                    ),
-                  ],
+            // --- Wallet Card ---
+            Container(
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF6A11CB), Color(0xFF2575FC)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
                 ),
+                borderRadius: BorderRadius.circular(22),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.deepPurple.withOpacity(0.3),
+                    blurRadius: 10,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
               ),
-            ),
-            const SizedBox(height: 20),
-            ElevatedButton.icon(
-              onPressed: _addRewardCoins,
-              icon: const Icon(Icons.play_circle_fill),
-              label: const Text('વીડિયો જુઓ (+10 સિક્કા)'),
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-              ),
-            ),
-            const SizedBox(height: 12),
-            ElevatedButton.icon(
-              onPressed: () => _showWithdrawDialog(balance),
-              icon: const Icon(Icons.account_balance_wallet),
-              label: const Text('પૈસા ઉપાડો (Withdraw)'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-              ),
-            ),
-            const SizedBox(height: 24),
-            const Text(
-              'તમારો ઉપાડ ઇતિહાસ (Withdrawal History)',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            ),
-            const Divider(),
-            Expanded(
-              child: _localWithdrawals.isEmpty
-                  ? const Center(child: Text('કોઈ રેકોર્ડ ઉપલબ્ધ નથી'))
-                  : ListView.builder(
-                      itemCount: _localWithdrawals.length,
-                      itemBuilder: (context, index) {
-                        final item = _localWithdrawals[index];
-                        return Card(
-                          child: ListTile(
-                            leading: const Icon(Icons.history),
-                            title: Text('${item['coins']} સિક્કા'),
-                            subtitle: Text('UPI: ${item['upiId']}'),
-                            trailing: Chip(
-                              label: Text(item['status'] ?? 'Pending'),
-                              backgroundColor: item['status'] == 'Approved'
-                                  ? Colors.green.shade100
-                                  : Colors.orange.shade100,
-                            ),
-                          ),
-                        );
-                      },
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 26),
+              child: Column(
+                children: [
+                  const Text(
+                    'Total Balance',
+                    style: TextStyle(color: Colors.white70, fontSize: 16),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.monetization_on_rounded, color: Colors.amberAccent, size: 36),
+                      const SizedBox(width: 8),
+                      Text(
+                        '$balance',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 38,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      const Text(
+                        'Coins',
+                        style: TextStyle(color: Colors.white, fontSize: 18),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(20),
                     ),
+                    child: const Text(
+                      '100 Coins = ₹10',
+                      style: TextStyle(color: Colors.white, fontSize: 12),
+                    ),
+                  )
+                ],
+              ),
             ),
-          ],
-        ),
-      ),
-    );
-  }
-}
+
+            const SizedBox(height: 18),
+
+            // --- Daily Bonus Card ---
+            Card(
+              elevation: 0,
+              color: Colors.amber.shade50,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: BorderSide(color: Colors.amber.shade200),
+              ),
+              child: ListTile(
+                leading: const CircleAvatar(
+                  backgroundColor: Colors.amber,
+                  child: Icon(Icons.card_giftcard, color: Colors.white),
+                ),
+                title: const Text('Daily Check-in Bonus', style: TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: const Text('Claim +25 Free Coins every day'),
+                trailing: ElevatedButton(
+                  onPressed: _claimedDailyBonus ? null : _claimDailyReward,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.amber.shade700,
+                    foregroundColor: Colors.white,
+      
