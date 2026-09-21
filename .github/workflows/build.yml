@@ -26,7 +26,7 @@ jobs:
       - name: Create complete Flutter structure
         run: |
           if [ ! -f "android/build.gradle" ]; then
-            flutter create --org com.example . --platforms=android
+            flutter create --project-name watchearnapp --org com.example . --platforms=android
           fi
 
       - name: Configure Android SDK versions
