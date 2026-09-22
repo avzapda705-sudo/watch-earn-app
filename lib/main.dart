@@ -225,7 +225,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
             const SizedBox(height: 24),
             const Text('Watch Video & Earn', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
-            const Text('Watch a short video and earn +10 coins instantly!', textAlign: TextAlign.center, style: TextStyle(color: Colors.grey)),
+            const Text('Watch a 30s video and earn +10 coins instantly!', textAlign: TextAlign.center, style: TextStyle(color: Colors.grey)),
             const SizedBox(height: 16),
             Text('Videos Watched Today: $_watchedCount', style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.bold)),
             const SizedBox(height: 32),
@@ -243,7 +243,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                       builder: (ctx) => VideoPlayerScreen(
                         videoTitle: 'Sponsored Ad Stream',
                         rewardCoins: 10,
-                        durationSeconds: 15,
+                        durationSeconds: 30, // ૩૦ સેકન્ડ પર સેટ કર્યું
                         onComplete: () => _addCoins(10),
                       ),
                     ),
