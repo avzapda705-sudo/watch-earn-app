@@ -22,7 +22,7 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.24.0'
+          flutter-version: '3.16.9'
           channel: 'stable'
 
       - name: Fix NDK Version
@@ -30,7 +30,7 @@ jobs:
           echo "android.ndkVersion=27.0.12077973" >> android/local.properties
 
       - name: Build APK
-        run: flutter build apk --release
+        run: flutter build apk --release --no-sound-null-safety
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
