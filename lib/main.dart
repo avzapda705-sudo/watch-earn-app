@@ -237,7 +237,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final screens = [
+    final List<Widget> screens = [
       _buildHomeScreen(),
       _buildReferScreen(),
       _buildWalletScreen(),
@@ -532,5 +532,4 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                 const SizedBox(height: 16),
                 SizedBox(
                   width: double.infinity,
-                  height: 48,
-           
+                  height: 48
