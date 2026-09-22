@@ -546,4 +546,20 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
               borderRadius: BorderRadius.circular(4),
             ),
           ),
-        
+          const SizedBox(height: 30),
+          if (_finished)
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF6C63FF),
+                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+              ),
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Back & Claim Coins', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            )
+          else
+            const Text('Do not close the video or reward will be lost', style: TextStyle(color: Colors.white38, fontSize: 12)),
+        ],
+      ),
+    );
+  }
+}
