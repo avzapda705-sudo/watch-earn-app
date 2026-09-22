@@ -206,7 +206,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       return;
     }
 
-    final coinsToWithdraw = 100;
+    const coinsToWithdraw = 100;
     setState(() {
       _balance -= coinsToWithdraw;
       _history.insert(0, {
@@ -290,7 +290,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       padding: const EdgeInsets.all(16),
       child: Column(
         children: [
-          // Total Balance Card
           Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
@@ -319,8 +318,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
             ),
           ),
           const SizedBox(height: 16),
-
-          // Two Stat Boxes
           Row(
             children: [
               Expanded(
@@ -369,8 +366,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
             ],
           ),
           const SizedBox(height: 16),
-
-          // Watch Video Button
           SizedBox(
             width: double.infinity,
             height: 52,
@@ -451,8 +446,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
             ),
           ),
           const SizedBox(height: 16),
-
-          // Referral Input Box
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(20),
@@ -481,7 +474,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                           filled: true,
                           fillColor: const Color(0xFF12141A),
                           contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Colors.white12)),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                         ),
                       ),
                     ),
@@ -533,4 +526,11 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                     hintStyle: const TextStyle(color: Colors.white30),
                     filled: true,
                     fillColor: const Color(0xFF12141A),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: co
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+           
