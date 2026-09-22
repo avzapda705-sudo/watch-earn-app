@@ -170,6 +170,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
               trailing: ElevatedButton(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: _claimedDailyBonus ? Colors.grey : const Color(0xFF6C63FF),
+                  foregroundColor: Colors.white,
                 ),
                 onPressed: _claimedDailyBonus
                     ? null
@@ -182,7 +183,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                           const SnackBar(content: Text('🎉 Claimed 50 Daily Coins!')),
                         );
                       },
-                child: Text(_claimedDailyBonus ? 'Claimed' : 'Claim'),
+                child: Text(_claimedDailyBonus ? 'Claimed' : 'Claim', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
               ),
             ),
           ),
@@ -238,9 +239,15 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
         subtitle: Text(subtitle),
         trailing: ElevatedButton(
-          style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6C63FF)),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF6C63FF),
+            foregroundColor: Colors.white,
+          ),
           onPressed: onTap,
-          child: Text(reward),
+          child: Text(
+            reward,
+            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          ),
         ),
       ),
     );
@@ -308,8 +315,10 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
           const SizedBox(height: 12),
           TextField(
             controller: upiController,
+            style: const TextStyle(color: Colors.white),
             decoration: InputDecoration(
               hintText: 'Enter UPI ID (e.g. mobile@upi)',
+              hintStyle: const TextStyle(color: Colors.grey),
               filled: true,
               fillColor: const Color(0xFF1E1E1E),
               border: OutlineInputBorder(
@@ -323,7 +332,10 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
             width: double.infinity,
             height: 48,
             child: ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6C63FF)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF6C63FF),
+                foregroundColor: Colors.white,
+              ),
               onPressed: () {
                 if (upiController.text.trim().isEmpty) {
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -343,7 +355,10 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                 );
                 upiController.clear();
               },
-              child: const Text('Withdraw ₹10 (100 Coins)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              child: const Text(
+                'Withdraw ₹10 (100 Coins)',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+              ),
             ),
           ),
         ],
