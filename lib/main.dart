@@ -1,22 +1,20 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  try {
+    await Firebase.initializeApp();
+    if (FirebaseAuth.instance.currentUser == null) {
+      await FirebaseAuth.instance.signInAnonymously();
+    }
+  } catch (e) {
+    debugPrint("Firebase init error: $e");
+  }
   runApp(const WatchEarnApp());
-}
-
-class WithdrawalRecord {
-  final String upiId;
-  final double amount;
-  final String date;
-  final String status;
-
-  WithdrawalRecord({
-    required this.upiId,
-    required this.amount,
-    required this.date,
-    required this.status,
-  });
 }
 
 class WatchEarnApp extends StatelessWidget {
@@ -54,30 +52,85 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   int _coins = 150;
   bool _claimedDailyBonus = false;
   int _watchedCount = 0;
-  final List<WithdrawalRecord> _withdrawalHistory = [];
+  String? _userId;
 
-  void _addCoins(int amount) {
-    setState(() {
-      _coins += amount;
-      _watchedCount += 1;
-    });
+  @override
+  void initState() {
+    super.initState();
+    _initUserData();
   }
 
-  void _recordWithdrawal(String upi, double amount) {
-    final now = DateTime.now();
-    final dateStr = "${now.day}/${now.month}/${now.year} ${now.hour}:${now.minute.toString().padLeft(2, '0')}";
-    setState(() {
-      _coins -= (amount * 10).toInt();
-      _withdrawalHistory.insert(
-        0,
-        WithdrawalRecord(
-          upiId: upi,
-          amount: amount,
-          date: dateStr,
-          status: 'Processing',
-        ),
-      );
-    });
+  void _initUserData() {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      _userId = user.uid;
+      FirebaseFirestore.instance.collection('users').doc(_userId).snapshots().listen((doc) {
+        if (doc.exists && mounted) {
+          final data = doc.data();
+          setState(() {
+            _coins = data?['coins'] ?? 150;
+            _claimedDailyBonus = data?['claimedDailyBonus'] ?? false;
+            _watchedCount = data?['watchedCount'] ?? 0;
+          });
+        } else if (!doc.exists) {
+          FirebaseFirestore.instance.collection('users').doc(_userId).set({
+            'coins': 150,
+            'claimedDailyBonus': false,
+            'watchedCount': 0,
+            'createdAt': FieldValue.serverTimestamp(),
+          });
+        }
+      });
+    }
+  }
+
+  void _addCoins(int amount) {
+    if (_userId != null) {
+      FirebaseFirestore.instance.collection('users').doc(_userId).update({
+        'coins': FieldValue.increment(amount),
+        'watchedCount': FieldValue.increment(1),
+      });
+    } else {
+      setState(() {
+        _coins += amount;
+        _watchedCount += 1;
+      });
+    }
+  }
+
+  void _claimDailyBonus() {
+    if (_userId != null) {
+      FirebaseFirestore.instance.collection('users').doc(_userId).update({
+        'coins': FieldValue.increment(50),
+        'claimedDailyBonus': true,
+      });
+    } else {
+      setState(() {
+        _coins += 50;
+        _claimedDailyBonus = true;
+      });
+    }
+  }
+
+  void _submitWithdrawal(String upi, double amount) {
+    final coinsToDeduct = (amount * 10).toInt();
+    if (_userId != null) {
+      FirebaseFirestore.instance.collection('users').doc(_userId).update({
+        'coins': FieldValue.increment(-coinsToDeduct),
+      });
+
+      FirebaseFirestore.instance.collection('withdrawals').add({
+        'userId': _userId,
+        'upiId': upi,
+        'amount': amount,
+        'status': 'Processing',
+        'timestamp': FieldValue.serverTimestamp(),
+      });
+    } else {
+      setState(() {
+        _coins -= coinsToDeduct;
+      });
+    }
   }
 
   @override
@@ -193,10 +246,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                 onPressed: _claimedDailyBonus
                     ? null
                     : () {
-                        setState(() {
-                          _claimedDailyBonus = true;
-                          _coins += 50;
-                        });
+                        _claimDailyBonus();
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(content: Text('🎉 Claimed 50 Daily Coins!')),
                         );
@@ -356,7 +406,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                   );
                   return;
                 }
-                _recordWithdrawal(upi, 10.0);
+                _submitWithdrawal(upi, 10.0);
                 upiController.clear();
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(content: Text('✅ Withdrawal request of ₹10 submitted for $upi!')),
@@ -368,24 +418,35 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
           const SizedBox(height: 28),
           const Text('Withdrawal History', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 12),
-          _withdrawalHistory.isEmpty
-              ? Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1E1E1E),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Center(
-                    child: Text('No withdrawal history yet.', style: TextStyle(color: Colors.grey)),
-                  ),
-                )
-              : ListView.builder(
+          if (_userId == null)
+            const Center(child: Text('Loading History...', style: TextStyle(color: Colors.grey)))
+          else
+            StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance
+                  .collection('withdrawals')
+                  .where('userId', isEqualTo: _userId)
+                  .snapshots(),
+              builder: (context, snapshot) {
+                if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                  return Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1E1E1E),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Center(
+                      child: Text('No withdrawal history yet.', style: TextStyle(color: Colors.grey)),
+                    ),
+                  );
+                }
+
+                return ListView.builder(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
-                  itemCount: _withdrawalHistory.length,
+                  itemCount: snapshot.data!.docs.length,
                   itemBuilder: (context, index) {
-                    final item = _withdrawalHistory[index];
+                    final item = snapshot.data!.docs[index].data() as Map<String, dynamic>;
                     return Card(
                       color: const Color(0xFF1E1E1E),
                       margin: const EdgeInsets.only(bottom: 10),
@@ -394,8 +455,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                           backgroundColor: Colors.amber,
                           child: Icon(Icons.currency_rupee, color: Colors.black),
                         ),
-                        title: Text('₹${item.amount.toStringAsFixed(0)} to ${item.upiId}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: Text(item.date, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                        title: Text('₹${item['amount']} to ${item['upiId']}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                        subtitle: Text(item['status'] ?? 'Processing', style: const TextStyle(color: Colors.grey, fontSize: 12)),
                         trailing: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                           decoration: BoxDecoration(
@@ -404,14 +465,16 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                             border: Border.all(color: Colors.orange),
                           ),
                           child: Text(
-                            item.status,
+                            item['status'] ?? 'Processing',
                             style: const TextStyle(color: Colors.orange, fontSize: 12, fontWeight: FontWeight.bold),
                           ),
                         ),
                       ),
                     );
                   },
-                ),
+                );
+              },
+            ),
         ],
       ),
     );
@@ -492,7 +555,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
             decoration: BoxDecoration(
               color: const Color(0xFF1E1E1E),
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFF6C63FF), width: 2),
+              border: Border.all(color: const Color(0xFF6C63FF), width: 2)               ),
             ),
             child: Stack(
               alignment: Alignment.center,
