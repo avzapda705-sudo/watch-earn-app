@@ -22,12 +22,15 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.16.9'
+          flutter-version: '3.10.6'
           channel: 'stable'
 
-      - name: Fix NDK Version
+      - name: Fix Android v1 Embedding & NDK
         run: |
           echo "android.ndkVersion=27.0.12077973" >> android/local.properties
+          # v1 embedding નો એરર આપતો જૂનો ટેગ હટાવવો
+          find android/ -name "AndroidManifest.xml" -exec sed -i '/android.app.lib_name/d' {} +
+          find android/ -name "AndroidManifest.xml" -exec sed -i '/flutterEmbedding/d' {} +
 
       - name: Build APK
         run: flutter build apk --release
