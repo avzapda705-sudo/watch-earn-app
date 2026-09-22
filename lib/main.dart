@@ -206,7 +206,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       return;
     }
 
-    const coinsToWithdraw = 100;
+    const int coinsToWithdraw = 100;
     setState(() {
       _balance -= coinsToWithdraw;
       _history.insert(0, {
@@ -237,12 +237,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final List<Widget> screens = [
-      _buildHomeScreen(),
-      _buildReferScreen(),
-      _buildWalletScreen(),
-    ];
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Watch & Earn Pro', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
@@ -268,7 +262,14 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
           )
         ],
       ),
-      body: screens[_currentIndex],
+      body: IndexedStack(
+        index: _currentIndex,
+        children: [
+          _buildHomeScreen(),
+          _buildReferScreen(),
+          _buildWalletScreen(),
+        ],
+      ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         onTap: (index) => setState(() => _currentIndex = index),
@@ -432,7 +433,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                   height: 48,
                   child: ElevatedButton.icon(
                     onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Share link copied to clipboard!')));
+                      Clipboard.setData(ClipboardData(text: 'Download Watch & Earn Pro and use my code $_myReferralCode to get 50 coins!'));
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Share text copied to clipboard!')));
                     },
                     icon: const Icon(Icons.share, color: Colors.black),
                     label: const Text('Share on WhatsApp', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
@@ -527,9 +529,4 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                     filled: true,
                     fillColor: const Color(0xFF12141A),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                SizedBox(
-                  width: double.infinity,
-                  height: 48
+      
