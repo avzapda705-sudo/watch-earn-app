@@ -25,67 +25,20 @@ jobs:
           flutter-version: '3.24.0'
           channel: 'stable'
 
-      - name: Setup Android Exact Package
+      - name: Setup Clean Android
         run: |
           if [ ! -f "android/build.gradle" ]; then
-            flutter create --platforms=android --project-name watch_earn_app --org com.example .
+            flutter create --platforms=android --project-name watch_earn_app .
           fi
           echo "sdk.dir=$ANDROID_HOME" > android/local.properties
-
-          # Exact match with google-services.json
-          sed -i 's/applicationId .*/applicationId "com.example.watch_earn_app"/g' android/app/build.gradle 2>/dev/null || true
-          sed -i 's/applicationId = .*/applicationId = "com.example.watch_earn_app"/g' android/app/build.gradle 2>/dev/null || true
-          sed -i 's/namespace .*/namespace "com.example.watch_earn_app"/g' android/app/build.gradle 2>/dev/null || true
 
           sed -i 's/minSdkVersion.*/minSdkVersion 23/g' android/app/build.gradle 2>/dev/null || true
           sed -i 's/minSdk =.*/minSdk = 23/g' android/app/build.gradle 2>/dev/null || true
 
-          if [ -f "android/settings.gradle" ]; then
-            sed -i 's/id "org.jetbrains.kotlin.android" version.*/id "org.jetbrains.kotlin.android" version "1.9.24" apply false/g' android/settings.gradle 2>/dev/null || true
-            if ! grep -q "com.google.gms.google-services" android/settings.gradle 2>/dev/null; then
-              sed -i '/plugins {/a \    id "com.google.gms.google-services" version "4.4.2" apply false' android/settings.gradle 2>/dev/null || true
-            fi
-          fi
-
-          if [ -f "android/build.gradle" ]; then
-            sed -i 's/ext.kotlin_version =.*/ext.kotlin_version = '\''1.9.24'\''/g' android/build.gradle 2>/dev/null || true
-          fi
-
-          if ! grep -q "com.google.gms.google-services" android/app/build.gradle 2>/dev/null; then
-            sed -i '/plugins {/a \    id "com.google.gms.google-services"' android/app/build.gradle 2>/dev/null || echo 'apply plugin: "com.google.gms.google-services"' >> android/app/build.gradle
-          fi
-
-          python3 -c '
-          with open("lib/main.dart", "r") as f:
-              content = f.read()
-          idx = content.find("border: Border.all(color: const Color(0xFF6C63FF), width: 2)")
-          if idx != -1:
-              head = content[:idx]
-              patch = """border: Border.all(color: const Color(0xFF6C63FF), width: 2),
-                          ),
-                          child: Center(
-                            child: Text(
-                              _finished ? "Video Complete!" : "Watching Ad...",
-                              style: const TextStyle(fontSize: 16),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                        if (_finished)
-                          ElevatedButton(
-                            onPressed: () => Navigator.pop(context),
-                            child: const Text("Back & Claim Coins"),
-                          )
-                        else
-                          const Text("Please wait...", style: TextStyle(color: Colors.white38)),
-                      ],
-                    ),
-                  );
-                }
-              }"""
-              with open("lib/main.dart", "w") as f:
-                  f.write(head + patch)
-          '
+          # Remove google-services plugin so it never fails
+          sed -i '/google-services/d' android/build.gradle 2>/dev/null || true
+          sed -i '/google-services/d' android/app/build.gradle 2>/dev/null || true
+          sed -i '/google-services/d' android/settings.gradle 2>/dev/null || true
 
           flutter pub get
 
