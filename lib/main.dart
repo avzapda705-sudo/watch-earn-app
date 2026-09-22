@@ -233,7 +233,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
             ),
             const SizedBox(height: 8),
             const Text(
-              'Watch a short video completely and earn +25 coins instantly!',
+              'Watch a short video completely and earn +10 coins instantly!',
               textAlign: TextAlign.center,
               style: TextStyle(color: Colors.grey, fontSize: 14),
             ),
@@ -262,7 +262,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                 ),
                 icon: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 28),
                 label: const Text(
-                  'Watch Video (+25 Coins)',
+                  'Watch Video (+10 Coins)',
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
                 ),
                 onPressed: () {
@@ -271,9 +271,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                     MaterialPageRoute(
                       builder: (context) => VideoPlayerScreen(
                         videoTitle: 'Sponsored Ad Stream',
-                        rewardCoins: 25,
+                        rewardCoins: 10,
                         durationSeconds: 15,
-                        onComplete: () => _addCoins(25),
+                        onComplete: () => _addCoins(10),
                       ),
                     ),
                   );
@@ -323,7 +323,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
             controller: upiController,
             style: const TextStyle(color: Colors.white),
             decoration: InputDecoration(
-              hintText: 'Enter UPI ID (e.g. yourname@okaxis)',
+              hintText: 'Enter UPI ID (e.g. mobile@upi)',
               hintStyle: const TextStyle(color: Colors.grey),
               filled: true,
               fillColor: const Color(0xFF1E1E1E),
@@ -546,4 +546,4 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
               borderRadius: BorderRadius.circular(4),
             ),
           ),
-   
+        
