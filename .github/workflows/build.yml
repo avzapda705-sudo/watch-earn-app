@@ -25,18 +25,16 @@ jobs:
           flutter-version: '3.24.0'
           channel: 'stable'
 
-      - name: Repair Android, Kotlin & Firebase Configuration
+      - name: Fix Missing Code and Config
         run: |
           if [ ! -f "android/build.gradle" ]; then
             flutter create --platforms=android --project-name watch_earn_app --org com.watchearn .
           fi
           echo "sdk.dir=$ANDROID_HOME" > android/local.properties
 
-          # Bump minSdk to 23
           sed -i 's/minSdkVersion.*/minSdkVersion 23/g' android/app/build.gradle 2>/dev/null || true
           sed -i 's/minSdk =.*/minSdk = 23/g' android/app/build.gradle 2>/dev/null || true
 
-          # Set Kotlin version to 1.9.24 in settings.gradle and root build.gradle
           if [ -f "android/settings.gradle" ]; then
             sed -i 's/id "org.jetbrains.kotlin.android" version.*/id "org.jetbrains.kotlin.android" version "1.9.24" apply false/g' android/settings.gradle 2>/dev/null || true
             if ! grep -q "com.google.gms.google-services" android/settings.gradle 2>/dev/null; then
@@ -44,15 +42,16 @@ jobs:
             fi
           fi
 
-          # Set ext.kotlin_version if older root build.gradle exists
           if [ -f "android/build.gradle" ]; then
             sed -i 's/ext.kotlin_version =.*/ext.kotlin_version = '\''1.9.24'\''/g' android/build.gradle 2>/dev/null || true
           fi
 
-          # Apply google services to app build.gradle
           if ! grep -q "com.google.gms.google-services" android/app/build.gradle 2>/dev/null; then
             sed -i '/plugins {/a \    id "com.google.gms.google-services"' android/app/build.gradle 2>/dev/null || echo 'apply plugin: "com.google.gms.google-services"' >> android/app/build.gradle
           fi
+
+          # Fix incomplete line in lib/main.dart automatically
+          sed -i '/border: Border.all(color: const Color(0xFF6C63FF), width: 2)/c\            border: Border.all(color: const Color(0xFF6C63FF), width: 2),),),child: Center(child: Text(_finished ? "Video Complete!" : "Watching Ad...", style: const TextStyle(fontSize: 16))),),const SizedBox(height: 20),if (_finished) ElevatedButton(onPressed: () => Navigator.pop(context), child: const Text("Back & Claim Coins")) else const Text("Wait...", style: TextStyle(color: Colors.white38)),],),);}}' lib/main.dart
 
           flutter pub get
 
