@@ -1,21 +1,15 @@
-name: watchearnapp
-description: "A Watch and Earn Flutter application."
-publish_to: 'none'
-
+name: watch_earn_app
+description: "Watch and Earn Mobile App"
+publish_to: "none"
 version: 1.0.0+1
 
 environment:
-  sdk: '>=3.0.0 <4.0.0'
+  sdk: ">=3.0.0 <4.0.0"
 
 dependencies:
   flutter:
     sdk: flutter
-  google_mobile_ads: ^5.2.0
-  share_plus: ^10.1.4
-  cupertino_icons: ^1.0.6
-  firebase_core: ^3.10.0
-  firebase_auth: ^5.4.0
-  cloud_firestore: ^5.6.0
+  shared_preferences: ^2.2.2
 
 dev_dependencies:
   flutter_test:
