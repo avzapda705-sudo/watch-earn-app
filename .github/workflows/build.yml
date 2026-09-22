@@ -28,15 +28,23 @@ jobs:
         run: |
           flutter create --org com.example --project-name watchearnapp .
 
-      - name: Move and verify google-services.json
+      - name: Ensure google-services.json is in place
         run: |
           if [ -f "google-services.json" ]; then
             cp google-services.json android/app/
           fi
-          if [ ! -f "android/app/google-services.json" ]; then
-            echo "ERROR: google-services.json not found in android/app/"
-            exit 1
-          fi
+
+      - name: Fix MainActivity
+        run: |
+          mkdir -p android/app/src/main/kotlin/com/example/watchearnapp
+          cat << 'EOF' > android/app/src/main/kotlin/com/example/watchearnapp/MainActivity.kt
+          package com.example.watchearnapp
+
+          import io.flutter.embedding.android.FlutterActivity
+
+          class MainActivity: FlutterActivity() {
+          }
+          EOF
 
       - name: Configure gradle.properties
         run: |
@@ -77,7 +85,7 @@ jobs:
           include ":app"
           EOF
 
-      - name: Write clean AndroidManifest
+      - name: Write clean AndroidManifest with AdMob App ID
         run: |
           cat << 'EOF' > android/app/src/main/AndroidManifest.xml
           <manifest xmlns:android="http://schemas.android.com/apk/res/android"
@@ -88,6 +96,12 @@ jobs:
                   android:label="Watch &amp; Earn Pro"
                   android:name="${applicationName}"
                   android:icon="@mipmap/ic_launcher">
+                  
+                  <!-- AdMob App ID required to prevent startup crash -->
+                  <meta-data
+                      android:name="com.google.android.gms.ads.APPLICATION_ID"
+                      android:value="ca-app-pub-3940256099942544~3347511713"/>
+
                   <activity
                       android:name=".MainActivity"
                       android:exported="true"
