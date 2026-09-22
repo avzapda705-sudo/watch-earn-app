@@ -50,6 +50,39 @@ jobs:
             sed -i '/plugins {/a \    id "com.google.gms.google-services"' android/app/build.gradle 2>/dev/null || echo 'apply plugin: "com.google.gms.google-services"' >> android/app/build.gradle
           fi
 
+          # Fix incomplete end of main.dart safely
+          python3 -c '
+          with open("lib/main.dart", "r") as f:
+              content = f.read()
+          idx = content.find("border: Border.all(color: const Color(0xFF6C63FF), width: 2)")
+          if idx != -1:
+              head = content[:idx]
+              patch = """border: Border.all(color: const Color(0xFF6C63FF), width: 2),
+                          ),
+                          child: Center(
+                            child: Text(
+                              _finished ? "Video Complete!" : "Watching Ad...",
+                              style: const TextStyle(fontSize: 16),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        if (_finished)
+                          ElevatedButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text("Back & Claim Coins"),
+                          )
+                        else
+                          const Text("Please wait...", style: TextStyle(color: Colors.white38)),
+                      ],
+                    ),
+                  );
+                }
+              }"""
+              with open("lib/main.dart", "w") as f:
+                  f.write(head + patch)
+          '
+
           flutter pub get
 
       - name: Build Release APK
