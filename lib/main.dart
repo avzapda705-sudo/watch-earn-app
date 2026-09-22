@@ -555,4 +555,75 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
             decoration: BoxDecoration(
               color: const Color(0xFF1E1E1E),
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFF6C63FF), width: 2)
+              border: Border.all(color: const Color(0xFF6C63FF), width: 2)                   ),
+                ),
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          _finished ? Icons.check_circle_outline : Icons.play_circle_fill,
+                          size: 64,
+                          color: _finished ? Colors.greenAccent : const Color(0xFF6C63FF),
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          _finished ? 'Video Complete!' : 'Watching Sponsored Video Stream...',
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          _finished ? '+${widget.rewardCoins} Coins Earned!' : 'Please watch till end to claim coins',
+                          style: TextStyle(color: _finished ? Colors.amber : Colors.grey),
+                        ),
+                      ],
+                    ),
+                    Positioned(
+                      top: 12,
+                      right: 12,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.black87,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          _finished ? 'Done' : 'Reward in: ${_remaining}s',
+                          style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.amber),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: LinearProgressIndicator(
+                  value: progress,
+                  backgroundColor: Colors.grey.shade800,
+                  color: const Color(0xFF03DAC6),
+                  minHeight: 8,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+              const SizedBox(height: 30),
+              if (_finished)
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF6C63FF),
+                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                  ),
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Back & Claim Coins', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                )
+              else
+                const Text('Do not close the video or reward will be lost', style: TextStyle(color: Colors.white38, fontSize: 12)),
+            ],
+          ),
+        );
+      }
+}
+
