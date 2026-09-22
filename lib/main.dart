@@ -1,7 +1,22 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 
 void main() {
   runApp(const WatchEarnApp());
+}
+
+class WithdrawalRecord {
+  final String upiId;
+  final double amount;
+  final String date;
+  final String status;
+
+  WithdrawalRecord({
+    required this.upiId,
+    required this.amount,
+    required this.date,
+    required this.status,
+  });
 }
 
 class WatchEarnApp extends StatelessWidget {
@@ -38,21 +53,31 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   int _currentIndex = 0;
   int _coins = 150;
   bool _claimedDailyBonus = false;
+  int _watchedCount = 0;
+  final List<WithdrawalRecord> _withdrawalHistory = [];
 
   void _addCoins(int amount) {
     setState(() {
       _coins += amount;
+      _watchedCount += 1;
     });
   }
 
-  bool _deductCoins(int amount) {
-    if (_coins >= amount) {
-      setState(() {
-        _coins -= amount;
-      });
-      return true;
-    }
-    return false;
+  void _recordWithdrawal(String upi, double amount) {
+    final now = DateTime.now();
+    final dateStr = "${now.day}/${now.month}/${now.year} ${now.hour}:${now.minute.toString().padLeft(2, '0')}";
+    setState(() {
+      _coins -= (amount * 10).toInt();
+      _withdrawalHistory.insert(
+        0,
+        WithdrawalRecord(
+          upiId: upi,
+          amount: amount,
+          date: dateStr,
+          status: 'Processing',
+        ),
+      );
+    });
   }
 
   @override
@@ -103,7 +128,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         unselectedItemColor: Colors.grey,
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-          BottomNavigationBarItem(icon: Icon(Icons.play_circle_filled), label: 'Watch & Tasks'),
+          BottomNavigationBarItem(icon: Icon(Icons.play_circle_filled), label: 'Watch & Earn'),
           BottomNavigationBarItem(icon: Icon(Icons.account_balance_wallet), label: 'Wallet'),
         ],
       ),
@@ -130,10 +155,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Available Balance',
-                  style: TextStyle(color: Colors.white70, fontSize: 14),
-                ),
+                const Text('Available Balance', style: TextStyle(color: Colors.white70, fontSize: 14)),
                 const SizedBox(height: 8),
                 Row(
                   children: [
@@ -141,11 +163,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                     const SizedBox(width: 8),
                     Text(
                       '$_coins Coins',
-                      style: const TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
+                      style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white),
                     ),
                   ],
                 ),
@@ -193,91 +211,79 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   }
 
   Widget _buildTasksScreen() {
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        const Text('Watch Videos & Earn', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 12),
-        _buildTaskTile(
-          icon: Icons.video_collection,
-          title: 'Watch Sponsored Ad 1',
-          subtitle: 'Watch full 30s video to earn',
-          reward: '+20 Coins',
-          onTap: () => _simulateWatchVideo(20),
-        ),
-        _buildTaskTile(
-          icon: Icons.video_collection,
-          title: 'Watch Sponsored Ad 2',
-          subtitle: 'Watch short clip to earn',
-          reward: '+15 Coins',
-          onTap: () => _simulateWatchVideo(15),
-        ),
-        _buildTaskTile(
-          icon: Icons.play_arrow,
-          title: 'Watch Promotional Trailer',
-          subtitle: 'Complete video stream',
-          reward: '+30 Coins',
-          onTap: () => _simulateWatchVideo(30),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildTaskTile({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required String reward,
-    required VoidCallback onTap,
-  }) {
-    return Card(
-      color: const Color(0xFF1E1E1E),
-      margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: ListTile(
-        leading: Icon(icon, color: const Color(0xFF03DAC6), size: 32),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text(subtitle),
-        trailing: ElevatedButton(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF6C63FF),
-            foregroundColor: Colors.white,
-          ),
-          onPressed: onTap,
-          child: Text(
-            reward,
-            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _simulateWatchVideo(int reward) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1E1E1E),
-        title: const Text('Playing Video Ad...'),
-        content: const Column(
-          mainAxisSize: MainAxisSize.min,
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 16),
-            Text('Simulating ad stream. Please wait 3 seconds...'),
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E1E1E),
+                shape: BoxShape.circle,
+                border: Border.all(color: const Color(0xFF6C63FF), width: 3),
+              ),
+              child: const Icon(Icons.play_circle_fill_rounded, size: 80, color: Color(0xFF03DAC6)),
+            ),
+            const SizedBox(height: 24),
+            const Text(
+              'Watch Video & Earn',
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Watch a short video completely and earn +25 coins instantly!',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.grey, fontSize: 14),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E1E1E),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: Colors.white12),
+              ),
+              child: Text(
+                'Videos Watched Today: $_watchedCount',
+                style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.bold),
+              ),
+            ),
+            const SizedBox(height: 32),
+            SizedBox(
+              width: double.infinity,
+              height: 54,
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF6C63FF),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  elevation: 4,
+                ),
+                icon: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 28),
+                label: const Text(
+                  'Watch Video (+25 Coins)',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+                ),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => VideoPlayerScreen(
+                        videoTitle: 'Sponsored Ad Stream',
+                        rewardCoins: 25,
+                        durationSeconds: 15,
+                        onComplete: () => _addCoins(25),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
           ],
         ),
       ),
     );
-
-    Future.delayed(const Duration(seconds: 3), () {
-      Navigator.pop(context);
-      _addCoins(reward);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('🎉 Video completed! You earned $reward coins!')),
-      );
-    });
   }
 
   Widget _buildWalletScreen() {
@@ -317,7 +323,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
             controller: upiController,
             style: const TextStyle(color: Colors.white),
             decoration: InputDecoration(
-              hintText: 'Enter UPI ID (e.g. mobile@upi)',
+              hintText: 'Enter UPI ID (e.g. yourname@okaxis)',
               hintStyle: const TextStyle(color: Colors.grey),
               filled: true,
               fillColor: const Color(0xFF1E1E1E),
@@ -337,32 +343,207 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                 foregroundColor: Colors.white,
               ),
               onPressed: () {
-                if (upiController.text.trim().isEmpty) {
+                final upi = upiController.text.trim();
+                if (upi.isEmpty || !upi.contains('@')) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Please enter a valid UPI ID')),
+                    const SnackBar(content: Text('Please enter a valid UPI ID (e.g. name@upi)')),
                   );
                   return;
                 }
                 if (_coins < 100) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Insufficient balance! Minimum 100 coins required.')),
+                    const SnackBar(content: Text('Minimum 100 Coins (₹10) required to withdraw!')),
                   );
                   return;
                 }
-                _deductCoins(100);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('✅ Withdrawal of ₹10 initiated to ${upiController.text}!')),
-                );
+                _recordWithdrawal(upi, 10.0);
                 upiController.clear();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('✅ Withdrawal request of ₹10 submitted for $upi!')),
+                );
               },
-              child: const Text(
-                'Withdraw ₹10 (100 Coins)',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
-              ),
+              child: const Text('Withdraw ₹10 (100 Coins)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
             ),
           ),
+          const SizedBox(height: 28),
+          const Text('Withdrawal History', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 12),
+          _withdrawalHistory.isEmpty
+              ? Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1E1E1E),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Center(
+                    child: Text('No withdrawal history yet.', style: TextStyle(color: Colors.grey)),
+                  ),
+                )
+              : ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: _withdrawalHistory.length,
+                  itemBuilder: (context, index) {
+                    final item = _withdrawalHistory[index];
+                    return Card(
+                      color: const Color(0xFF1E1E1E),
+                      margin: const EdgeInsets.only(bottom: 10),
+                      child: ListTile(
+                        leading: const CircleAvatar(
+                          backgroundColor: Colors.amber,
+                          child: Icon(Icons.currency_rupee, color: Colors.black),
+                        ),
+                        title: Text('₹${item.amount.toStringAsFixed(0)} to ${item.upiId}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                        subtitle: Text(item.date, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                        trailing: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.orange.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.orange),
+                          ),
+                          child: Text(
+                            item.status,
+                            style: const TextStyle(color: Colors.orange, fontSize: 12, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
         ],
       ),
     );
   }
 }
+
+class VideoPlayerScreen extends StatefulWidget {
+  final String videoTitle;
+  final int rewardCoins;
+  final int durationSeconds;
+  final VoidCallback onComplete;
+
+  const VideoPlayerScreen({
+    super.key,
+    required this.videoTitle,
+    required this.rewardCoins,
+    required this.durationSeconds,
+    required this.onComplete,
+  });
+
+  @override
+  State<VideoPlayerScreen> createState() => _VideoPlayerScreenState();
+}
+
+class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
+  late int _remaining;
+  Timer? _timer;
+  bool _finished = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _remaining = widget.durationSeconds;
+    _startTimer();
+  }
+
+  void _startTimer() {
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (_remaining > 1) {
+        setState(() {
+          _remaining--;
+        });
+      } else {
+        _timer?.cancel();
+        setState(() {
+          _remaining = 0;
+          _finished = true;
+        });
+        widget.onComplete();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final progress = (widget.durationSeconds - _remaining) / widget.durationSeconds;
+
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        title: Text(widget.videoTitle),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        automaticallyImplyLeading: _finished,
+      ),
+      body: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            height: 220,
+            margin: const EdgeInsets.symmetric(horizontal: 16),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1E1E1E),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFF6C63FF), width: 2),
+            ),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      _finished ? Icons.check_circle_outline : Icons.play_circle_fill,
+                      size: 64,
+                      color: _finished ? Colors.greenAccent : const Color(0xFF6C63FF),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      _finished ? 'Video Complete!' : 'Watching Sponsored Video Stream...',
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      _finished ? '+${widget.rewardCoins} Coins Earned!' : 'Please watch till end to claim coins',
+                      style: TextStyle(color: _finished ? Colors.amber : Colors.grey),
+                    ),
+                  ],
+                ),
+                Positioned(
+                  top: 12,
+                  right: 12,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.black87,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      _finished ? 'Done' : 'Reward in: ${_remaining}s',
+                      style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.amber),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: LinearProgressIndicator(
+              value: progress,
+              backgroundColor: Colors.grey.shade800,
+              color: const Color(0xFF03DAC6),
+              minHeight: 8,
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ),
+   
