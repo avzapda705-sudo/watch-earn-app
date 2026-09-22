@@ -27,8 +27,7 @@ jobs:
 
       - name: Repair Flutter & Android Structure
         run: |
-          # જો android ફોલ્ડર ખૂટતું હોય તો આખું એન્ડ્રોઇડ પ્લેટફોર્મ નવેસરથી જનરેટ થશે
-          flutter create --platforms=android --org com.watchandearn .
+          flutter create --platforms=android --project-name watch_earn_app --org com.watchearn .
           echo "android.ndkVersion=27.0.12077973" >> android/local.properties
 
       - name: Build Release APK
