@@ -1,39 +1,25 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 
-bool isFirebaseReady = false;
-
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  try {
-    await Firebase.initializeApp();
-    await FirebaseAuth.instance.signInAnonymously();
-    isFirebaseReady = true;
-  } catch (e) {
-    isFirebaseReady = false;
-    debugPrint('Firebase init error: $e');
-  }
-  runApp(const WatchAndEarnApp());
+void main() {
+  runApp(const WatchEarnApp());
 }
 
-class WatchAndEarnApp extends StatelessWidget {
-  const WatchAndEarnApp({super.key});
+class WatchEarnApp extends StatelessWidget {
+  const WatchEarnApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Watch & Earn Pro',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData.dark().copyWith(
-        scaffoldBackgroundColor: const Color(0xFF0F1015),
-        primaryColor: const Color(0xFFF5B300),
-        cardColor: const Color(0xFF1B1D24),
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Color(0xFF0F1015),
-          elevation: 0,
+      theme: ThemeData(
+        brightness: Brightness.dark,
+        primaryColor: const Color(0xFF6C63FF),
+        scaffoldBackgroundColor: const Color(0xFF121212),
+        colorScheme: const ColorScheme.dark(
+          primary: Color(0xFF6C63FF),
+          secondary: Color(0xFF03DAC6),
+          surface: Color(0xFF1E1E1E),
         ),
       ),
       home: const MainNavigationScreen(),
@@ -50,236 +36,74 @@ class MainNavigationScreen extends StatefulWidget {
 
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
   int _currentIndex = 0;
-  int _balance = 0;
-  bool _claimedDaily = false;
-  bool _appliedReferral = false;
-  int _remainingAds = 15;
-  final String _myReferralCode = "PRO708058";
-  final List<Map<String, dynamic>> _history = [];
-  String? _userId;
+  int _coins = 150;
+  bool _claimedDailyBonus = false;
 
-  final TextEditingController _referralInputController = TextEditingController();
-  final TextEditingController _upiController = TextEditingController();
-
-  @override
-  void initState() {
-    super.initState();
-    _loadUserData();
-  }
-
-  @override
-  void dispose() {
-    _referralInputController.dispose();
-    _upiController.dispose();
-    super.dispose();
-  }
-
-  void _loadUserData() async {
-    if (!isFirebaseReady) return;
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      _userId = user.uid;
-      final doc = await FirebaseFirestore.instance.collection('users').doc(_userId).get();
-      if (doc.exists && doc.data() != null) {
-        final data = doc.data()!;
-        setState(() {
-          _balance = data['balance'] ?? 0;
-          _claimedDaily = data['claimedDaily'] ?? false;
-          _appliedReferral = data['appliedReferral'] ?? false;
-          _remainingAds = data['remainingAds'] ?? 15;
-        });
-      } else {
-        await FirebaseFirestore.instance.collection('users').doc(_userId).set({
-          'balance': 0,
-          'claimedDaily': false,
-          'appliedReferral': false,
-          'remainingAds': 15,
-        });
-      }
-    }
-  }
-
-  void _syncFirebase() async {
-    if (isFirebaseReady && _userId != null) {
-      await FirebaseFirestore.instance.collection('users').doc(_userId).set({
-        'balance': _balance,
-        'claimedDaily': _claimedDaily,
-        'appliedReferral': _appliedReferral,
-        'remainingAds': _remainingAds,
-      }, SetOptions(merge: true));
-    }
-  }
-
-  void _claimDailyBonus() {
-    if (_claimedDaily) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Daily bonus already claimed for today!')),
-      );
-      return;
-    }
+  void _addCoins(int amount) {
     setState(() {
-      _balance += 25;
-      _claimedDaily = true;
-      _history.insert(0, {'title': 'Daily Bonus', 'coins': '+25', 'time': 'Just now'});
+      _coins += amount;
     });
-    _syncFirebase();
   }
 
-  void _watchVideoAd() {
-    if (_remainingAds <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Daily ad limit reached. Come back tomorrow!')),
-      );
-      return;
-    }
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) {
-        return AlertDialog(
-          backgroundColor: const Color(0xFF1E2029),
-          title: const Text('Playing Video Ad', style: TextStyle(color: Colors.white)),
-          content: const Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              CircularProgressIndicator(color: Color(0xFFF5B300)),
-              SizedBox(height: 16),
-              Text('Watch the complete video to claim 10 coins.', style: TextStyle(color: Colors.white70)),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-                setState(() {
-                  _balance += 10;
-                  _remainingAds -= 1;
-                  _history.insert(0, {'title': 'Watched Video Ad', 'coins': '+10', 'time': 'Just now'});
-                });
-                _syncFirebase();
-              },
-              child: const Text('Claim Reward', style: TextStyle(color: Color(0xFFF5B300))),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  void _applyReferralCode() {
-    if (_appliedReferral) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Referral code already claimed!')),
-      );
-      return;
-    }
-    final code = _referralInputController.text.trim();
-    if (code.isEmpty) return;
-
-    setState(() {
-      _balance += 50;
-      _appliedReferral = true;
-      _history.insert(0, {'title': 'Referral Bonus', 'coins': '+50', 'time': 'Just now'});
-    });
-    _referralInputController.clear();
-    _syncFirebase();
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Success! 50 Coins added.')),
-    );
-  }
-
-  void _submitWithdrawal() async {
-    final upi = _upiController.text.trim();
-    if (upi.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a valid UPI ID!')),
-      );
-      return;
-    }
-
-    if (_balance < 100) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Minimum withdrawal is 100 Coins (₹10)!')),
-      );
-      return;
-    }
-
-    const int coinsToWithdraw = 100;
-    setState(() {
-      _balance -= coinsToWithdraw;
-      _history.insert(0, {
-        'title': 'Withdrawal ($upi)',
-        'coins': '-$coinsToWithdraw',
-        'time': 'Just now',
+  bool _deductCoins(int amount) {
+    if (_coins >= amount) {
+      setState(() {
+        _coins -= amount;
       });
-    });
-
-    _syncFirebase();
-
-    if (isFirebaseReady && _userId != null) {
-      await FirebaseFirestore.instance.collection('withdrawals').add({
-        'userId': _userId,
-        'upi': upi,
-        'coins': coinsToWithdraw,
-        'inrAmount': 10.0,
-        'status': 'pending',
-        'createdAt': FieldValue.serverTimestamp(),
-      });
+      return true;
     }
-
-    _upiController.clear();
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Withdrawal request submitted successfully!')),
-    );
+    return false;
   }
 
   @override
   Widget build(BuildContext context) {
+    final List<Widget> pages = [
+      _buildHomeScreen(),
+      _buildTasksScreen(),
+      _buildWalletScreen(),
+    ];
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Watch & Earn Pro', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+        title: const Text('Watch & Earn Pro', style: TextStyle(fontWeight: FontWeight.bold)),
+        backgroundColor: const Color(0xFF1E1E1E),
+        elevation: 0,
         actions: [
           Container(
-            margin: const EdgeInsets.only(right: 16),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+            margin: const EdgeInsets.only(right: 16, top: 10, bottom: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 12),
             decoration: BoxDecoration(
-              color: const Color(0xFF262111),
+              color: Colors.amber.withOpacity(0.2),
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: const Color(0xFF8A6C1A)),
+              border: Border.all(color: Colors.amber, width: 1.5),
             ),
             child: Row(
               children: [
-                const Icon(Icons.monetization_on, color: Color(0xFFF5B300), size: 18),
+                const Icon(Icons.monetization_on, color: Colors.amber, size: 20),
                 const SizedBox(width: 6),
                 Text(
-                  '$_balance',
-                  style: const TextStyle(color: Color(0xFFF5B300), fontWeight: FontWeight.bold, fontSize: 15),
+                  '$_coins',
+                  style: const TextStyle(
+                    color: Colors.amber,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
                 ),
               ],
             ),
           )
         ],
       ),
-      body: IndexedStack(
-        index: _currentIndex,
-        children: [
-          _buildHomeScreen(),
-          _buildReferScreen(),
-          _buildWalletScreen(),
-        ],
-      ),
+      body: pages[_currentIndex],
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         onTap: (index) => setState(() => _currentIndex = index),
-        backgroundColor: const Color(0xFF0F1015),
-        selectedItemColor: const Color(0xFFF5B300),
-        unselectedItemColor: Colors.white54,
-        type: BottomNavigationBarType.fixed,
+        backgroundColor: const Color(0xFF1E1E1E),
+        selectedItemColor: const Color(0xFF6C63FF),
+        unselectedItemColor: Colors.grey,
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-          BottomNavigationBarItem(icon: Icon(Icons.card_giftcard), label: 'Refer & Earn'),
+          BottomNavigationBarItem(icon: Icon(Icons.play_circle_filled), label: 'Watch & Tasks'),
           BottomNavigationBarItem(icon: Icon(Icons.account_balance_wallet), label: 'Wallet'),
         ],
       ),
@@ -290,243 +114,240 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+            padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: const Color(0xFF1B1D24),
+              gradient: const LinearGradient(
+                colors: [Color(0xFF6C63FF), Color(0xFF3F3D56)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Available Balance',
+                  style: TextStyle(color: Colors.white70, fontSize: 14),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    const Icon(Icons.monetization_on, color: Colors.amber, size: 32),
+                    const SizedBox(width: 8),
+                    Text(
+                      '$_coins Coins',
+                      style: const TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '≈ ₹${(_coins / 10).toStringAsFixed(2)} INR',
+                  style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+          const Text('Daily Rewards', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 12),
+          Card(
+            color: const Color(0xFF1E1E1E),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            child: ListTile(
+              leading: const Icon(Icons.card_giftcard, color: Colors.pinkAccent, size: 36),
+              title: const Text('Daily Check-in Bonus', style: TextStyle(fontWeight: FontWeight.bold)),
+              subtitle: const Text('Claim +50 coins everyday!'),
+              trailing: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _claimedDailyBonus ? Colors.grey : const Color(0xFF6C63FF),
+                ),
+                onPressed: _claimedDailyBonus
+                    ? null
+                    : () {
+                        setState(() {
+                          _claimedDailyBonus = true;
+                          _coins += 50;
+                        });
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('🎉 Claimed 50 Daily Coins!')),
+                        );
+                      },
+                child: Text(_claimedDailyBonus ? 'Claimed' : 'Claim'),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTasksScreen() {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        const Text('Watch Videos & Earn', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 12),
+        _buildTaskTile(
+          icon: Icons.video_collection,
+          title: 'Watch Sponsored Ad 1',
+          subtitle: 'Watch full 30s video to earn',
+          reward: '+20 Coins',
+          onTap: () => _simulateWatchVideo(20),
+        ),
+        _buildTaskTile(
+          icon: Icons.video_collection,
+          title: 'Watch Sponsored Ad 2',
+          subtitle: 'Watch short clip to earn',
+          reward: '+15 Coins',
+          onTap: () => _simulateWatchVideo(15),
+        ),
+        _buildTaskTile(
+          icon: Icons.play_arrow,
+          title: 'Watch Promotional Trailer',
+          subtitle: 'Complete video stream',
+          reward: '+30 Coins',
+          onTap: () => _simulateWatchVideo(30),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTaskTile({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required String reward,
+    required VoidCallback onTap,
+  }) {
+    return Card(
+      color: const Color(0xFF1E1E1E),
+      margin: const EdgeInsets.only(bottom: 12),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: ListTile(
+        leading: Icon(icon, color: const Color(0xFF03DAC6), size: 32),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+        subtitle: Text(subtitle),
+        trailing: ElevatedButton(
+          style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6C63FF)),
+          onPressed: onTap,
+          child: Text(reward),
+        ),
+      ),
+    );
+  }
+
+  void _simulateWatchVideo(int reward) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1E1E1E),
+        title: const Text('Playing Video Ad...'),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 16),
+            Text('Simulating ad stream. Please wait 3 seconds...'),
+          ],
+        ),
+      ),
+    );
+
+    Future.delayed(const Duration(seconds: 3), () {
+      Navigator.pop(context);
+      _addCoins(reward);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('🎉 Video completed! You earned $reward coins!')),
+      );
+    });
+  }
+
+  Widget _buildWalletScreen() {
+    final TextEditingController upiController = TextEditingController();
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1E1E1E),
               borderRadius: BorderRadius.circular(16),
               border: Border.all(color: Colors.white10),
             ),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFF5B300),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.star, color: Colors.black, size: 28),
+                const Text('Current Balance', style: TextStyle(color: Colors.white70)),
+                const SizedBox(height: 8),
+                Text(
+                  '$_coins Coins (₹${(_coins / 10).toStringAsFixed(2)})',
+                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.amber),
                 ),
-                const SizedBox(height: 12),
-                const Text('Total Balance', style: TextStyle(color: Colors.white60, fontSize: 14)),
-                const SizedBox(height: 6),
-                Text('$_balance Coins', style: const TextStyle(color: Color(0xFFF5B300), fontSize: 26, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 4),
-                Text('Approx ₹${(_balance / 10).toStringAsFixed(1)} Value', style: const TextStyle(color: Colors.white54, fontSize: 13)),
+                const SizedBox(height: 8),
+                const Text('10 Coins = ₹1 INR | Minimum Withdraw: 100 Coins (₹10)', style: TextStyle(fontSize: 12, color: Colors.grey)),
               ],
             ),
           ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 18),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1B1D24),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Column(
-                    children: [
-                      const Text('Remaining Ads', style: TextStyle(color: Colors.white60, fontSize: 13)),
-                      const SizedBox(height: 8),
-                      Text('$_remainingAds / 15', style: const TextStyle(color: Color(0xFFF5B300), fontSize: 18, fontWeight: FontWeight.bold)),
-                    ],
-                  ),
-                ),
+          const SizedBox(height: 24),
+          const Text('Withdraw Funds via UPI', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 12),
+          TextField(
+            controller: upiController,
+            decoration: InputDecoration(
+              hintText: 'Enter UPI ID (e.g. mobile@upi)',
+              filled: true,
+              fillColor: const Color(0xFF1E1E1E),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide.none,
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: InkWell(
-                  onTap: _claimDailyBonus,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 18),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1B1D24),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: Column(
-                      children: [
-                        const Text('Daily Bonus', style: TextStyle(color: Colors.white60, fontSize: 13)),
-                        const SizedBox(height: 8),
-                        Text(
-                          _claimedDaily ? 'Claimed' : '+25 Claim',
-                          style: TextStyle(
-                            color: _claimedDaily ? Colors.grey : const Color(0xFF38E54D),
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
           const SizedBox(height: 16),
           SizedBox(
             width: double.infinity,
-            height: 52,
-            child: ElevatedButton.icon(
-              onPressed: _watchVideoAd,
-              icon: const Icon(Icons.play_circle_fill, color: Colors.black),
-              label: const Text('Watch Video & Earn (+10 Coins)', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 15)),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFF5B300),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
+            height: 48,
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6C63FF)),
+              onPressed: () {
+                if (upiController.text.trim().isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Please enter a valid UPI ID')),
+                  );
+                  return;
+                }
+                if (_coins < 100) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Insufficient balance! Minimum 100 coins required.')),
+                  );
+                  return;
+                }
+                _deductCoins(100);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('✅ Withdrawal of ₹10 initiated to ${upiController.text}!')),
+                );
+                upiController.clear();
+              },
+              child: const Text('Withdraw ₹10 (100 Coins)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
             ),
           ),
         ],
       ),
     );
   }
-
-  Widget _buildReferScreen() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        children: [
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: const Color(0xFF1B1D24),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.white10),
-            ),
-            child: Column(
-              children: [
-                const Icon(Icons.group, color: Color(0xFF4CA5FF), size: 48),
-                const SizedBox(height: 12),
-                const Text('Invite Friends & Earn', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
-                const SizedBox(height: 6),
-                const Text('Both you and your friend get 50 free coins on every referral!', textAlign: TextAlign.center, style: TextStyle(color: Colors.white60, fontSize: 13)),
-                const SizedBox(height: 20),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF12141A),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: Colors.white12),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(_myReferralCode, style: const TextStyle(color: Color(0xFFF5B300), fontSize: 20, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
-                      IconButton(
-                        icon: const Icon(Icons.copy, color: Colors.white70),
-                        onPressed: () {
-                          Clipboard.setData(ClipboardData(text: _myReferralCode));
-                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Referral code copied!')));
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      Clipboard.setData(ClipboardData(text: 'Download Watch & Earn Pro and use my code $_myReferralCode to get 50 coins!'));
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Share text copied to clipboard!')));
-                    },
-                    icon: const Icon(Icons.share, color: Colors.black),
-                    label: const Text('Share on WhatsApp', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF25D366),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: const Color(0xFF1B1D24),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.white10),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Have a Referral Code?', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white)),
-                const SizedBox(height: 6),
-                const Text('Enter friend\'s referral code to instantly get 50 coins:', style: TextStyle(color: Colors.white60, fontSize: 13)),
-                const SizedBox(height: 14),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _referralInputController,
-                        enabled: !_appliedReferral,
-                        style: const TextStyle(color: Colors.white),
-                        decoration: InputDecoration(
-                          hintText: _appliedReferral ? 'Already Applied' : 'e.g. PRO12345',
-                          hintStyle: const TextStyle(color: Colors.white30),
-                          filled: true,
-                          fillColor: const Color(0xFF12141A),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    ElevatedButton(
-                      onPressed: _appliedReferral ? null : _applyReferralCode,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFF5B300),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                      ),
-                      child: const Text('Apply', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildWalletScreen() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        children: [
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: const Color(0xFF1B1D24),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.white10),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('UPI Withdrawal', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
-                const SizedBox(height: 4),
-                const Text('Rule: 100 Coins = ₹10 (Minimum withdrawal 100 coins)', style: TextStyle(color: Colors.white54, fontSize: 12)),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: _upiController,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: InputDecoration(
-                    hintText: 'Your UPI ID (e.g. user@okaxis)',
-                    hintStyle: const TextStyle(color: Colors.white30),
-                    filled: true,
-                    fillColor: const Color(0xFF12141A),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-     
+}
