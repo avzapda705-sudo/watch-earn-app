@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:share_plus/share_plus.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -46,6 +47,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   bool _claimedReferralBonus = false;
   int _watchedCount = 0;
   final String _myReferralCode = "EARN705";
+  final String _appDownloadUrl = "https://github.com/avzapda705/watch-earn-app";
   List<Map<String, dynamic>> _withdrawals = [];
   final TextEditingController _friendReferralController = TextEditingController();
 
@@ -108,12 +110,20 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     }
 
     setState(() {
-      _coins += 100; // 100+ બોનસ કોઈન્સ
+      _coins += 100;
       _claimedReferralBonus = true;
     });
     _saveData();
     _friendReferralController.clear();
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('🎉 Congratulations! +100 Coins Added!')));
+  }
+
+  void _shareReferralLink() {
+    final String shareMessage =
+        "🔥 Download Watch & Earn Pro and earn real cash daily!\n\n"
+        "🎁 Use my Referral Code: *$_myReferralCode* to get 100 FREE Coins instantly!\n\n"
+        "📲 Download App here: $_appDownloadUrl";
+    Share.share(shareMessage, subject: "Invite to Watch & Earn Pro");
   }
 
   void _submitWithdrawal(String upi, int coinsToWithdraw) {
@@ -257,19 +267,34 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                         Text(_myReferralCode, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF03DAC6), letterSpacing: 1.5)),
                       ],
                     ),
-                    ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF6C63FF),
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      ),
-                      onPressed: () {
-                        Clipboard.setData(ClipboardData(text: _myReferralCode));
-                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Referral Code Copied!')));
-                      },
-                      icon: const Icon(Icons.copy, size: 18),
-                      label: const Text('Copy'),
-                    )
+                    Row(
+                      children: [
+                        IconButton(
+                          style: IconButton.styleFrom(
+                            backgroundColor: const Color(0xFF2C2C2C),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                          onPressed: () {
+                            Clipboard.setData(ClipboardData(text: _myReferralCode));
+                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Referral Code Copied!')));
+                          },
+                          icon: const Icon(Icons.copy, size: 18, color: Colors.white),
+                          tooltip: 'Copy Code',
+                        ),
+                        const SizedBox(width: 8),
+                        ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF6C63FF),
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          ),
+                          onPressed: _shareReferralLink,
+                          icon: const Icon(Icons.share, size: 18),
+                          label: const Text('Share'),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
                 const Divider(height: 28, color: Colors.white12),
@@ -445,32 +470,10 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                 _submitWithdrawal(upi, requestedCoins);
                 upiController.clear();
                 ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                  content: Text('Withdrawal request of ₹${(requestedCoins / 10).toStringAsFixed(2)} ($requestedCoins coins) submitted!'),
+                  content: Text('Withdrawal request of ₹${(requestedCoins / 10).toStringAsFixed(2)} submitted!'),
                 ));
               },
               child: const Text('Submit Withdrawal Request', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
             ),
           ),
-          const SizedBox(height: 28),
-          const Text('Withdrawal History', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 12),
-          if (_withdrawals.isEmpty)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(color: const Color(0xFF1E1E1E), borderRadius: BorderRadius.circular(12)),
-              child: const Center(child: Text('No withdrawal history yet.', style: TextStyle(color: Colors.grey))),
-            )
-          else
-            ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: _withdrawals.length,
-              itemBuilder: (context, index) {
-                final item = _withdrawals[index];
-                return Card(
-                  color: const Color(0xFF1E1E1E),
-                  child: ListTile(
-                    leading: const CircleAvatar(backgroundColor: Colors.amber, child: Icon(Icons.currency_rupee, color: Colors.black)),
-                    title: Text('₹${item['amount']} (${item['coins']} Coins)', style: const TextStyle(fontWeight: FontWeight.bold)),
-                    subtitle
+          const Siz
