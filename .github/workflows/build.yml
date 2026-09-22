@@ -2,6 +2,8 @@ name: Build Android APK
 
 on:
   workflow_dispatch:
+  push:
+    branches: [ main ]
 
 jobs:
   build:
@@ -12,7 +14,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v3
         with:
           distribution: 'zulu'
           java-version: '17'
@@ -20,162 +22,419 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.24.5'
+          flutter-version: '3.24.0'
           channel: 'stable'
-          cache: true
 
-      - name: Create Flutter structure
+      - name: Set up Android NDK
         run: |
-          flutter create --org com.example --project-name watchearnapp .
+          echo "y" | sudo /usr/local/lib/android/sdk/cmdline-tools/latest/bin/sdkmanager --install "ndk;27.0.12077973"
+          echo "android.ndkVersion=27.0.12077973" >> android/local.properties
 
-      - name: Ensure google-services.json is in place
+      - name: Fetch Clean Main Code
         run: |
-          if [ -f "google-services.json" ]; then
-            cp google-services.json android/app/
-          fi
+          mkdir -p lib
+          cat << 'EOF' > lib/main.dart
+          import 'package:flutter/material.dart';
+          import 'package:flutter/services.dart';
 
-      - name: Fix MainActivity
-        run: |
-          mkdir -p android/app/src/main/kotlin/com/example/watchearnapp
-          cat << 'EOF' > android/app/src/main/kotlin/com/example/watchearnapp/MainActivity.kt
-          package com.example.watchearnapp
-
-          import io.flutter.embedding.android.FlutterActivity
-
-          class MainActivity: FlutterActivity() {
+          void main() {
+            WidgetsFlutterBinding.ensureInitialized();
+            runApp(const WatchAndEarnApp());
           }
-          EOF
 
-      - name: Configure gradle.properties
-        run: |
-          cat << 'EOF' > android/gradle.properties
-          org.gradle.jvmargs=-Xmx4096m
-          android.useAndroidX=true
-          android.enableJetifier=false
-          EOF
+          class WatchAndEarnApp extends StatelessWidget {
+            const WatchAndEarnApp({super.key});
 
-      - name: Configure root settings.gradle
-        run: |
-          cat << 'EOF' > android/settings.gradle
-          pluginManagement {
-              def flutterSdkPath = {
-                  def properties = new Properties()
-                  file("local.properties").withInputStream { properties.load(it) }
-                  def flutterSdkPath = properties.getProperty("flutter.sdk")
-                  assert flutterSdkPath != null : "flutter.sdk not set in local.properties"
-                  return flutterSdkPath
-              }()
+            @override
+            Widget build(BuildContext context) {
+              return MaterialApp(
+                title: 'Watch & Earn Pro',
+                debugShowCheckedModeBanner: false,
+                theme: ThemeData.dark().copyWith(
+                  scaffoldBackgroundColor: const Color(0xFF0F1015),
+                  primaryColor: const Color(0xFFF5B300),
+                  cardColor: const Color(0xFF1B1D24),
+                  appBarTheme: const AppBarTheme(
+                    backgroundColor: Color(0xFF0F1015),
+                    elevation: 0,
+                  ),
+                ),
+                home: const MainNavigationScreen(),
+              );
+            }
+          }
 
-              includeBuild("$flutterSdkPath/packages/flutter_tools/gradle")
+          class MainNavigationScreen extends StatefulWidget {
+            const MainNavigationScreen({super.key});
 
-              repositories {
-                  google()
-                  mavenCentral()
-                  gradlePluginPortal()
+            @override
+            State<MainNavigationScreen> createState() => _MainNavigationScreenState();
+          }
+
+          class _MainNavigationScreenState extends State<MainNavigationScreen> {
+            int _currentIndex = 0;
+            int _balance = 100;
+            bool _claimedDaily = false;
+            bool _appliedReferral = false;
+            int _remainingAds = 15;
+            final String _myReferralCode = "PRO708058";
+            final List<Map<String, dynamic>> _history = [];
+
+            final TextEditingController _referralInputController = TextEditingController();
+            final TextEditingController _upiController = TextEditingController();
+
+            @override
+            void dispose() {
+              _referralInputController.dispose();
+              _upiController.dispose();
+              super.dispose();
+            }
+
+            void _claimDailyBonus() {
+              if (_claimedDaily) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Daily bonus already claimed for today!')),
+                );
+                return;
               }
-          }
+              setState(() {
+                _balance += 25;
+                _claimedDaily = true;
+                _history.insert(0, {'title': 'Daily Bonus', 'coins': '+25', 'time': 'Just now'});
+              });
+            }
 
-          plugins {
-              id "dev.flutter.flutter-plugin-loader" version "1.0.0"
-              id "com.android.application" version "8.2.1" apply false
-              id "org.jetbrains.kotlin.android" version "2.1.0" apply false
-              id "com.google.gms.google-services" version "4.4.2" apply false
-          }
-
-          include ":app"
-          EOF
-
-      - name: Write clean AndroidManifest with AdMob App ID
-        run: |
-          cat << 'EOF' > android/app/src/main/AndroidManifest.xml
-          <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-              package="com.example.watchearnapp">
-              <uses-permission android:name="android.permission.INTERNET"/>
-              <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
-              <application
-                  android:label="Watch &amp; Earn Pro"
-                  android:name="${applicationName}"
-                  android:icon="@mipmap/ic_launcher">
-                  
-                  <!-- AdMob App ID required to prevent startup crash -->
-                  <meta-data
-                      android:name="com.google.android.gms.ads.APPLICATION_ID"
-                      android:value="ca-app-pub-3940256099942544~3347511713"/>
-
-                  <activity
-                      android:name=".MainActivity"
-                      android:exported="true"
-                      android:launchMode="singleTop"
-                      android:theme="@style/LaunchTheme"
-                      android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
-                      android:hardwareAccelerated="true"
-                      android:windowSoftInputMode="adjustResize">
-                      <intent-filter>
-                          <action android:name="android.intent.action.MAIN"/>
-                          <category android:name="android.intent.category.LAUNCHER"/>
-                      </intent-filter>
-                  </activity>
-                  <meta-data
-                      android:name="flutterEmbedding"
-                      android:value="2" />
-              </application>
-          </manifest>
-          EOF
-
-      - name: Write build.gradle
-        run: |
-          cat << 'EOF' > android/app/build.gradle
-          plugins {
-              id "com.android.application"
-              id "kotlin-android"
-              id "dev.flutter.flutter-gradle-plugin"
-              id "com.google.gms.google-services"
-          }
-
-          android {
-              namespace = "com.example.watchearnapp"
-              compileSdk = 34
-              ndkVersion = flutter.ndkVersion
-
-              compileOptions {
-                  sourceCompatibility = JavaVersion.VERSION_17
-                  targetCompatibility = JavaVersion.VERSION_17
+            void _watchVideoAd() {
+              if (_remainingAds <= 0) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Daily ad limit reached. Come back tomorrow!')),
+                );
+                return;
               }
 
-              kotlinOptions {
-                  jvmTarget = JavaVersion.VERSION_17
+              showDialog(
+                context: context,
+                barrierDismissible: false,
+                builder: (context) {
+                  return AlertDialog(
+                    backgroundColor: const Color(0xFF1E2029),
+                    title: const Text('Playing Video Ad', style: TextStyle(color: Colors.white)),
+                    content: const Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        CircularProgressIndicator(color: Color(0xFFF5B300)),
+                        SizedBox(height: 16),
+                        Text('Watch the complete video to claim 10 coins.', style: TextStyle(color: Colors.white70)),
+                      ],
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          setState(() {
+                            _balance += 10;
+                            _remainingAds -= 1;
+                            _history.insert(0, {'title': 'Watched Video Ad', 'coins': '+10', 'time': 'Just now'});
+                          });
+                        },
+                        child: const Text('Claim Reward', style: TextStyle(color: Color(0xFFF5B300))),
+                      ),
+                    ],
+                  );
+                },
+              );
+            }
+
+            void _applyReferralCode() {
+              if (_appliedReferral) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Referral code already claimed!')),
+                );
+                return;
+              }
+              final code = _referralInputController.text.trim();
+              if (code.isEmpty) return;
+
+              setState(() {
+                _balance += 50;
+                _appliedReferral = true;
+                _history.insert(0, {'title': 'Referral Bonus', 'coins': '+50', 'time': 'Just now'});
+              });
+              _referralInputController.clear();
+
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Success! 50 Coins added.')),
+              );
+            }
+
+            void _submitWithdrawal() {
+              final upi = _upiController.text.trim();
+              if (upi.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Please enter a valid UPI ID!')),
+                );
+                return;
               }
 
-              defaultConfig {
-                  applicationId = "com.example.watchearnapp"
-                  minSdk = 23
-                  targetSdk = 34
-                  versionCode = 1
-                  versionName = "1.0.0"
-                  multiDexEnabled = true
+              if (_balance < 100) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Minimum withdrawal is 100 Coins (₹10)!')),
+                );
+                return;
               }
 
-              buildTypes {
-                  release {
-                      signingConfig = signingConfigs.debug
-                  }
-              }
-          }
+              const int coinsToWithdraw = 100;
+              setState(() {
+                _balance -= coinsToWithdraw;
+                _history.insert(0, {
+                  'title': 'Withdrawal ($upi)',
+                  'coins': '-$coinsToWithdraw',
+                  'time': 'Just now',
+                });
+              });
 
-          flutter {
-              source = "../.."
-          }
-          EOF
+              _upiController.clear();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Withdrawal request submitted successfully!')),
+              );
+            }
 
-      - name: Install Dependencies
-        run: flutter pub get
+            @override
+            Widget build(BuildContext context) {
+              return Scaffold(
+                appBar: AppBar(
+                  title: const Text('Watch & Earn Pro', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                  actions: [
+                    Container(
+                      margin: const EdgeInsets.only(right: 16),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF262111),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: const Color(0xFF8A6C1A)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.monetization_on, color: Color(0xFFF5B300), size: 18),
+                          const SizedBox(width: 6),
+                          Text(
+                            '$_balance',
+                            style: const TextStyle(color: Color(0xFFF5B300), fontWeight: FontWeight.bold, fontSize: 15),
+                          ),
+                        ],
+                      ),
+                    )
+                  ],
+                ),
+                body: IndexedStack(
+                  index: _currentIndex,
+                  children: [
+                    _buildHomeScreen(),
+                    _buildReferScreen(),
+                    _buildWalletScreen(),
+                  ],
+                ),
+                bottomNavigationBar: BottomNavigationBar(
+                  currentIndex: _currentIndex,
+                  onTap: (index) => setState(() => _currentIndex = index),
+                  backgroundColor: const Color(0xFF0F1015),
+                  selectedItemColor: const Color(0xFFF5B300),
+                  unselectedItemColor: Colors.white54,
+                  type: BottomNavigationBarType.fixed,
+                  items: const [
+                    BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
+                    BottomNavigationBarItem(icon: Icon(Icons.card_giftcard), label: 'Refer & Earn'),
+                    BottomNavigationBarItem(icon: Icon(Icons.account_balance_wallet), label: 'Wallet'),
+                  ],
+                ),
+              );
+            }
 
-      - name: Build APK
-        run: flutter build apk --release
+            Widget _buildHomeScreen() {
+              return SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1B1D24),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.white10),
+                      ),
+                      child: Column(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: const BoxDecoration(
+                              color: Color(0xFFF5B300),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.star, color: Colors.black, size: 28),
+                          ),
+                          const SizedBox(height: 12),
+                          const Text('Total Balance', style: TextStyle(color: Colors.white60, fontSize: 14)),
+                          const SizedBox(height: 6),
+                          Text('$_balance Coins', style: const TextStyle(color: Color(0xFFF5B300), fontSize: 26, fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 4),
+                          Text('Approx ₹${(_balance / 10).toStringAsFixed(1)} Value', style: const TextStyle(color: Colors.white54, fontSize: 13)),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 18),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF1B1D24),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: Column(
+                              children: [
+                                const Text('Remaining Ads', style: TextStyle(color: Colors.white60, fontSize: 13)),
+                                const SizedBox(height: 8),
+                                Text('$_remainingAds / 15', style: const TextStyle(color: Color(0xFFF5B300), fontSize: 18, fontWeight: FontWeight.bold)),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: InkWell(
+                            onTap: _claimDailyBonus,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 18),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF1B1D24),
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              child: Column(
+                                children: [
+                                  const Text('Daily Bonus', style: TextStyle(color: Colors.white60, fontSize: 13)),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    _claimedDaily ? 'Claimed' : '+25 Claim',
+                                    style: TextStyle(
+                                      color: _claimedDaily ? Colors.grey : const Color(0xFF38E54D),
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 52,
+                      child: ElevatedButton.icon(
+                        onPressed: _watchVideoAd,
+                        icon: const Icon(Icons.play_circle_fill, color: Colors.black),
+                        label: const Text('Watch Video & Earn (+10 Coins)', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 15)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFF5B300),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }
 
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
-          
+            Widget _buildReferScreen() {
+              return SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1B1D24),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.white10),
+                      ),
+                      child: Column(
+                        children: [
+                          const Icon(Icons.group, color: Color(0xFF4CA5FF), size: 48),
+                          const SizedBox(height: 12),
+                          const Text('Invite Friends & Earn', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+                          const SizedBox(height: 6),
+                          const Text('Both you and your friend get 50 free coins on every referral!', textAlign: TextAlign.center, style: TextStyle(color: Colors.white60, fontSize: 13)),
+                          const SizedBox(height: 20),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF12141A),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: Colors.white12),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(_myReferralCode, style: const TextStyle(color: Color(0xFFF5B300), fontSize: 20, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
+                                IconButton(
+                                  icon: const Icon(Icons.copy, color: Colors.white70),
+                                  onPressed: () {
+                                    Clipboard.setData(ClipboardData(text: _myReferralCode));
+                                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Referral code copied!')));
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          SizedBox(
+                            width: double.infinity,
+                            height: 48,
+                            child: ElevatedButton.icon(
+                              onPressed: () {
+                                Clipboard.setData(ClipboardData(text: 'Download Watch & Earn Pro and use my code $_myReferralCode to get 50 coins!'));
+                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Share text copied to clipboard!')));
+                              },
+                              icon: const Icon(Icons.share, color: Colors.black),
+                              label: const Text('Share on WhatsApp', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF25D366),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1B1D24),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.white10),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Have a Referral Code?', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white)),
+                          const SizedBox(height: 6),
+                          const Text('Enter friend\'s referral code to instantly get 50 coins:', style: TextStyle(color: Colors.white60, fontSize: 13)),
+                          const SizedBox(height: 14),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  controller: _referralInputController,
+                                  enabled: !_appliedReferral,
+                                  style: const TextStyle(color: Colors.white),
+                                  decoration: InputDecoration(
+                                    hintText: _appliedReferral ? 'Already Applied' : 'e.g. PRO12345',
+                                    hintStyle: const TextStyle(color: Colors.white30),
+               
