@@ -29,7 +29,13 @@ jobs:
         run: |
           flutter create --platforms=android --project-name watch_earn_app --org com.watchearn .
           echo "android.ndkVersion=27.0.12077973" >> android/local.properties
-          echo "flutter.minSdkVersion=23" >> android/local.properties
+          
+          # minSdkVersion ને ગ્રેડલમાં ગમે તે ફોર્મેટ હોય સીધું 23 કરી દેશે
+          sed -i 's/minSdkVersion.*/minSdkVersion 23/g' android/app/build.gradle 2>/dev/null || true
+          sed -i 's/minSdk =.*/minSdk = 23/g' android/app/build.gradle 2>/dev/null || true
+          sed -i 's/flutter.minSdkVersion/23/g' android/app/build.gradle 2>/dev/null || true
+
+          # Kotlin વર્ઝન ફિક્સ
           sed -i 's/ext.kotlin_version = .*/ext.kotlin_version = "1.9.24"/' android/build.gradle 2>/dev/null || true
           sed -i 's/id "org.jetbrains.kotlin.android" version "[^"]*"/id "org.jetbrains.kotlin.android" version "1.9.24"/' android/settings.gradle 2>/dev/null || true
 
