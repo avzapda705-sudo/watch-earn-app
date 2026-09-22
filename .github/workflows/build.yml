@@ -25,7 +25,7 @@ jobs:
           flutter-version: '3.24.0'
           channel: 'stable'
 
-      - name: Setup Clean Android
+      - name: Setup Clean Android & Update Kotlin
         run: |
           if [ ! -f "android/build.gradle" ]; then
             flutter create --platforms=android --project-name watch_earn_app .
@@ -34,6 +34,14 @@ jobs:
 
           sed -i 's/minSdkVersion.*/minSdkVersion 23/g' android/app/build.gradle 2>/dev/null || true
           sed -i 's/minSdk =.*/minSdk = 23/g' android/app/build.gradle 2>/dev/null || true
+
+          # Upgrade Kotlin version to 1.9.24 for shared_preferences
+          if [ -f "android/settings.gradle" ]; then
+            sed -i 's/id "org.jetbrains.kotlin.android" version .*/id "org.jetbrains.kotlin.android" version "1.9.24" apply false/g' android/settings.gradle 2>/dev/null || true
+          fi
+          if [ -f "android/build.gradle" ]; then
+            sed -i 's/ext.kotlin_version = .*/ext.kotlin_version = '\''1.9.24'\''/g' android/build.gradle 2>/dev/null || true
+          fi
 
           # Remove google-services plugin so it never fails
           sed -i '/google-services/d' android/build.gradle 2>/dev/null || true
