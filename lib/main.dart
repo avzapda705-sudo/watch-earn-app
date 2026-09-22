@@ -529,4 +529,4 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                     filled: true,
                     fillColor: const Color(0xFF12141A),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-      
+     
