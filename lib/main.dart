@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() async {
@@ -42,8 +43,11 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   int _currentIndex = 0;
   int _coins = 150;
   bool _claimedDailyBonus = false;
+  bool _claimedReferralBonus = false;
   int _watchedCount = 0;
+  final String _myReferralCode = "EARN705";
   List<Map<String, dynamic>> _withdrawals = [];
+  final TextEditingController _friendReferralController = TextEditingController();
 
   @override
   void initState() {
@@ -56,6 +60,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     setState(() {
       _coins = prefs.getInt('coins') ?? 150;
       _claimedDailyBonus = prefs.getBool('claimedDailyBonus') ?? false;
+      _claimedReferralBonus = prefs.getBool('claimedReferralBonus') ?? false;
       _watchedCount = prefs.getInt('watchedCount') ?? 0;
       final historyStr = prefs.getString('withdrawals') ?? '[]';
       _withdrawals = List<Map<String, dynamic>>.from(jsonDecode(historyStr));
@@ -66,6 +71,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt('coins', _coins);
     await prefs.setBool('claimedDailyBonus', _claimedDailyBonus);
+    await prefs.setBool('claimedReferralBonus', _claimedReferralBonus);
     await prefs.setInt('watchedCount', _watchedCount);
     await prefs.setString('withdrawals', jsonEncode(_withdrawals));
   }
@@ -86,13 +92,38 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     _saveData();
   }
 
-  void _submitWithdrawal(String upi, double amount) {
-    final deduct = (amount * 10).toInt();
+  void _redeemReferralCode() {
+    final code = _friendReferralController.text.trim().toUpperCase();
+    if (code.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter a referral code')));
+      return;
+    }
+    if (code == _myReferralCode) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('You cannot use your own referral code!')));
+      return;
+    }
+    if (_claimedReferralBonus) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Referral bonus already claimed!')));
+      return;
+    }
+
     setState(() {
-      _coins -= deduct;
+      _coins += 100; // 100+ બોનસ કોઈન્સ
+      _claimedReferralBonus = true;
+    });
+    _saveData();
+    _friendReferralController.clear();
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('🎉 Congratulations! +100 Coins Added!')));
+  }
+
+  void _submitWithdrawal(String upi, int coinsToWithdraw) {
+    final double rupees = coinsToWithdraw / 10.0;
+    setState(() {
+      _coins -= coinsToWithdraw;
       _withdrawals.insert(0, {
         'upiId': upi,
-        'amount': amount,
+        'coins': coinsToWithdraw,
+        'amount': rupees,
         'status': 'Processing',
         'date': DateTime.now().toString().substring(0, 16),
       });
@@ -202,6 +233,80 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
               ),
             ),
           ),
+          const SizedBox(height: 24),
+          const Text('Refer & Earn Program', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1E1E1E),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.white12),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Your Referral Code', style: TextStyle(color: Colors.grey, fontSize: 13)),
+                        const SizedBox(height: 4),
+                        Text(_myReferralCode, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF03DAC6), letterSpacing: 1.5)),
+                      ],
+                    ),
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF6C63FF),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      onPressed: () {
+                        Clipboard.setData(ClipboardData(text: _myReferralCode));
+                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Referral Code Copied!')));
+                      },
+                      icon: const Icon(Icons.copy, size: 18),
+                      label: const Text('Copy'),
+                    )
+                  ],
+                ),
+                const Divider(height: 28, color: Colors.white12),
+                const Text('Have a friend\'s code?', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _friendReferralController,
+                        enabled: !_claimedReferralBonus,
+                        style: const TextStyle(color: Colors.white),
+                        decoration: InputDecoration(
+                          hintText: _claimedReferralBonus ? 'Code Already Applied' : 'Enter referral code',
+                          hintStyle: const TextStyle(color: Colors.grey, fontSize: 14),
+                          filled: true,
+                          fillColor: const Color(0xFF121212),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _claimedReferralBonus ? Colors.grey : const Color(0xFF03DAC6),
+                        foregroundColor: Colors.black,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      onPressed: _claimedReferralBonus ? null : _redeemReferralCode,
+                      child: Text(_claimedReferralBonus ? 'Applied' : 'Apply (+100)'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -243,7 +348,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                       builder: (ctx) => VideoPlayerScreen(
                         videoTitle: 'Sponsored Ad Stream',
                         rewardCoins: 10,
-                        durationSeconds: 30, // ૩૦ સેકન્ડ પર સેટ કર્યું
+                        durationSeconds: 30,
                         onComplete: () => _addCoins(10),
                       ),
                     ),
@@ -259,6 +364,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
   Widget _buildWallet() {
     final upiController = TextEditingController();
+    final coinsController = TextEditingController(text: '200');
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -279,7 +386,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                 const SizedBox(height: 8),
                 Text('$_coins Coins (₹${(_coins / 10).toStringAsFixed(2)})', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.amber)),
                 const SizedBox(height: 8),
-                const Text('10 Coins = ₹1 INR | Minimum: 100 Coins (₹10)', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                const Text('10 Coins = ₹1 INR | Minimum Withdrawal: 200 Coins (₹20)', style: TextStyle(fontSize: 12, color: Colors.grey)),
               ],
             ),
           ),
@@ -297,6 +404,21 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
             ),
           ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: coinsController,
+            keyboardType: TextInputType.number,
+            style: const TextStyle(color: Colors.white),
+            decoration: InputDecoration(
+              labelText: 'Coins to Withdraw (Minimum 200)',
+              labelStyle: const TextStyle(color: Colors.grey),
+              hintText: 'e.g. 200, 500, 1000',
+              hintStyle: const TextStyle(color: Colors.white24),
+              filled: true,
+              fillColor: const Color(0xFF1E1E1E),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+            ),
+          ),
           const SizedBox(height: 16),
           SizedBox(
             width: double.infinity,
@@ -305,19 +427,28 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
               style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6C63FF), foregroundColor: Colors.white),
               onPressed: () {
                 final upi = upiController.text.trim();
+                final int? requestedCoins = int.tryParse(coinsController.text.trim());
+
                 if (upi.isEmpty || !upi.contains('@')) {
                   ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter a valid UPI ID')));
                   return;
                 }
-                if (_coins < 100) {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Minimum 100 Coins required!')));
+                if (requestedCoins == null || requestedCoins < 200) {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Minimum withdrawal is 200 Coins (₹20)!')));
                   return;
                 }
-                _submitWithdrawal(upi, 10.0);
+                if (_coins < requestedCoins) {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Insufficient balance! You have $_coins coins.')));
+                  return;
+                }
+
+                _submitWithdrawal(upi, requestedCoins);
                 upiController.clear();
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Withdrawal request of ₹10 submitted for $upi!')));
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                  content: Text('Withdrawal request of ₹${(requestedCoins / 10).toStringAsFixed(2)} ($requestedCoins coins) submitted!'),
+                ));
               },
-              child: const Text('Withdraw ₹10 (100 Coins)', style: TextStyle(fontWeight: FontWeight.bold)),
+              child: const Text('Submit Withdrawal Request', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
             ),
           ),
           const SizedBox(height: 28),
@@ -341,113 +472,5 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                   color: const Color(0xFF1E1E1E),
                   child: ListTile(
                     leading: const CircleAvatar(backgroundColor: Colors.amber, child: Icon(Icons.currency_rupee, color: Colors.black)),
-                    title: Text('₹${item['amount']} to ${item['upiId']}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                    subtitle: Text(item['date'] ?? '', style: const TextStyle(color: Colors.grey, fontSize: 12)),
-                    trailing: Text(item['status'] ?? 'Processing', style: const TextStyle(color: Colors.orange, fontWeight: FontWeight.bold)),
-                  ),
-                );
-              },
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-class VideoPlayerScreen extends StatefulWidget {
-  final String videoTitle;
-  final int rewardCoins;
-  final int durationSeconds;
-  final VoidCallback onComplete;
-
-  const VideoPlayerScreen({
-    super.key,
-    required this.videoTitle,
-    required this.rewardCoins,
-    required this.durationSeconds,
-    required this.onComplete,
-  });
-
-  @override
-  State<VideoPlayerScreen> createState() => _VideoPlayerScreenState();
-}
-
-class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
-  late int _remaining;
-  Timer? _timer;
-  bool _finished = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _remaining = widget.durationSeconds;
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (_remaining > 1) {
-        setState(() => _remaining--);
-      } else {
-        _timer?.cancel();
-        setState(() {
-          _remaining = 0;
-          _finished = true;
-        });
-        widget.onComplete();
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final progress = (widget.durationSeconds - _remaining) / widget.durationSeconds;
-
-    return Scaffold(
-      backgroundColor: Colors.black,
-      appBar: AppBar(title: Text(widget.videoTitle), backgroundColor: Colors.transparent, elevation: 0, automaticallyImplyLeading: _finished),
-      body: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            height: 200,
-            margin: const EdgeInsets.symmetric(horizontal: 16),
-            decoration: BoxDecoration(color: const Color(0xFF1E1E1E), borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFF6C63FF), width: 2)),
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(_finished ? Icons.check_circle_outline : Icons.play_circle_fill, size: 60, color: _finished ? Colors.greenAccent : const Color(0xFF6C63FF)),
-                    const SizedBox(height: 10),
-                    Text(_finished ? 'Video Complete!' : 'Watching Sponsored Video...', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 4),
-                    Text(_finished ? '+${widget.rewardCoins} Coins Earned!' : 'Please wait till timer ends', style: TextStyle(color: _finished ? Colors.amber : Colors.grey)),
-                  ],
-                ),
-                Positioned(top: 10, right: 10, child: Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: Colors.black87, borderRadius: BorderRadius.circular(10)), child: Text(_finished ? 'Done' : '${_remaining}s', style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.bold)))),
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: LinearProgressIndicator(value: progress, backgroundColor: Colors.grey.shade800, color: const Color(0xFF03DAC6)),
-          ),
-          const SizedBox(height: 25),
-          if (_finished)
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6C63FF), foregroundColor: Colors.white),
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Back & Claim Coins', style: TextStyle(fontWeight: FontWeight.bold)),
-            )
-          else
-            const Text('Do not close the screen', style: TextStyle(color: Colors.white38, fontSize: 12)),
-        ],
-      ),
-    );
-  }
-}
+                    title: Text('₹${item['amount']} (${item['coins']} Coins)', style: const TextStyle(fontWeight: FontWeight.bold)),
+                    subtitle
