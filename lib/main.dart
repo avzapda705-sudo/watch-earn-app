@@ -52,6 +52,8 @@ class _HomeScreenState extends State<HomeScreen> {
   String? _userId;
 
   final TextEditingController _referralController = TextEditingController();
+  final TextEditingController _upiController = TextEditingController();
+  final TextEditingController _amountController = TextEditingController();
 
   @override
   void initState() {
@@ -62,6 +64,8 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     _referralController.dispose();
+    _upiController.dispose();
+    _amountController.dispose();
     super.dispose();
   }
 
@@ -101,7 +105,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void _claimDaily() {
     if (_claimedDaily) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('આજનો ડેઇલી બોનસ ક્લેમ થઈ ગયો છે!')),
+        const SnackBar(content: Text('Daily bonus has already been claimed!')),
       );
       return;
     }
@@ -119,13 +123,13 @@ class _HomeScreenState extends State<HomeScreen> {
       barrierDismissible: false,
       builder: (context) {
         return AlertDialog(
-          title: const Text('વિડિયો ચાલી રહ્યો છે...'),
+          title: const Text('Playing Video Ad...'),
           content: const Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               CircularProgressIndicator(),
               SizedBox(height: 16),
-              Text('પૂરો વિડિયો જોવા પર 20 કોઈન્સ મળશે.'),
+              Text('Watch the complete video to earn 20 coins.'),
             ],
           ),
           actions: [
@@ -138,7 +142,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 });
                 _syncFirebase();
               },
-              child: const Text('ક્લેમ કરો'),
+              child: const Text('Claim Reward'),
             ),
           ],
         );
@@ -149,7 +153,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void _applyReferral() {
     if (_appliedReferral) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('રેફરલ કોડ પહેલેથી ઉપયોગ કરેલો છે!')),
+        const SnackBar(content: Text('Referral code has already been applied!')),
       );
       return;
     }
@@ -165,7 +169,110 @@ class _HomeScreenState extends State<HomeScreen> {
     _syncFirebase();
 
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('રેફરલ બોનસ +100 સફળતાપૂર્વક મળ્યું!')),
+      const SnackBar(content: Text('Referral bonus +100 coins credited successfully!')),
+    );
+  }
+
+  void _showWithdrawDialog() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Withdraw Funds'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('Available Balance: $_balance coins (100 coins = ₹10)'),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _upiController,
+                  decoration: const InputDecoration(
+                    labelText: 'UPI ID / Paytm Number',
+                    hintText: 'user@upi',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _amountController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Coins to Withdraw',
+                    hintText: 'e.g. 100',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final upi = _upiController.text.trim();
+                final coinsToWithdraw = int.tryParse(_amountController.text.trim()) ?? 0;
+
+                if (upi.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Please enter a valid UPI ID or Paytm number!')),
+                  );
+                  return;
+                }
+
+                if (coinsToWithdraw < 100) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Minimum withdrawal is 100 coins!')),
+                  );
+                  return;
+                }
+
+                if (coinsToWithdraw > _balance) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Insufficient balance!')),
+                  );
+                  return;
+                }
+
+                Navigator.pop(context);
+
+                setState(() {
+                  _balance -= coinsToWithdraw;
+                  _history.insert(0, {
+                    'title': 'Withdrawal ($upi)',
+                    'coins': '-$coinsToWithdraw',
+                    'time': 'Just now',
+                  });
+                });
+
+                _syncFirebase();
+
+                if (isFirebaseReady && _userId != null) {
+                  await FirebaseFirestore.instance.collection('withdrawals').add({
+                    'userId': _userId,
+                    'upi': upi,
+                    'coins': coinsToWithdraw,
+                    'inrAmount': (coinsToWithdraw / 10),
+                    'status': 'pending',
+                    'createdAt': FieldValue.serverTimestamp(),
+                  });
+                }
+
+                _upiController.clear();
+                _amountController.clear();
+
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Withdrawal request submitted successfully!')),
+                );
+              },
+              child: const Text('Submit'),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -183,7 +290,6 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Balance Card
             Card(
               elevation: 4,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -195,9 +301,9 @@ class _HomeScreenState extends State<HomeScreen> {
                     const Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('કુલ બેલેન્સ', style: TextStyle(fontSize: 16, color: Colors.grey)),
+                        Text('Total Balance', style: TextStyle(fontSize: 16, color: Colors.grey)),
                         SizedBox(height: 4),
-                        Text('તમારા કોઈન્સ', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                        Text('Your Coins', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                       ],
                     ),
                     Text('$_balance 🪙', style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.deepPurple)),
@@ -206,12 +312,10 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
             const SizedBox(height: 16),
-
-            // Daily Bonus Button
             ElevatedButton.icon(
               onPressed: _claimDaily,
               icon: const Icon(Icons.card_giftcard),
-              label: Text(_claimedDaily ? 'Daily Bonus Claimed' : 'Daily Bonus Claim કરો (+50)'),
+              label: Text(_claimedDaily ? 'Daily Bonus Claimed' : 'Claim Daily Bonus (+50)'),
               style: ElevatedButton.styleFrom(
                 minimumSize: const Size.fromHeight(50),
                 backgroundColor: _claimedDaily ? Colors.grey : Colors.deepPurple,
@@ -220,12 +324,10 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
             const SizedBox(height: 12),
-
-            // Watch Video Task
             ElevatedButton.icon(
               onPressed: _watchAdTask,
               icon: const Icon(Icons.play_circle_fill),
-              label: const Text('વિડિયો જુઓ અને કમાઓ (+20)'),
+              label: const Text('Watch Video & Earn (+20)'),
               style: ElevatedButton.styleFrom(
                 minimumSize: const Size.fromHeight(50),
                 backgroundColor: Colors.indigo,
@@ -233,9 +335,19 @@ class _HomeScreenState extends State<HomeScreen> {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
             ),
+            const SizedBox(height: 12),
+            ElevatedButton.icon(
+              onPressed: _showWithdrawDialog,
+              icon: const Icon(Icons.account_balance_wallet),
+              label: const Text('Withdraw Funds'),
+              style: ElevatedButton.styleFrom(
+                minimumSize: const Size.fromHeight(50),
+                backgroundColor: Colors.green.shade700,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
             const SizedBox(height: 20),
-
-            // Referral Code Box
             Card(
               elevation: 2,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -244,7 +356,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('મિત્રનો રેફરલ કોડ નાખો (+100)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    const Text('Enter Referral Code (+100)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                     const SizedBox(height: 10),
                     Row(
                       children: [
@@ -253,7 +365,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             controller: _referralController,
                             enabled: !_appliedReferral,
                             decoration: InputDecoration(
-                              hintText: _appliedReferral ? 'પહેલેથી ઉપયોગ કરેલો છે' : 'રેફરલ કોડ લખો',
+                              hintText: _appliedReferral ? 'Already Applied' : 'Referral code',
                               contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                               border: const OutlineInputBorder(),
                             ),
@@ -270,7 +382,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text('તમારો રેફરલ કોડ:', style: TextStyle(color: Colors.grey)),
+                        const Text('Your Referral Code:', style: TextStyle(color: Colors.grey)),
                         SelectableText(_myReferralCode, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.deepPurple)),
                       ],
                     ),
@@ -279,14 +391,12 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
             const SizedBox(height: 20),
-
-            // Earnings History
-            const Text('કમાણીનો ઇતિહાસ:', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            const Text('Activity History:', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             _history.isEmpty
                 ? const Padding(
                     padding: EdgeInsets.symmetric(vertical: 24.0),
-                    child: Center(child: Text('હજુ સુધી કોઈ કમાણી થઈ નથી.', style: TextStyle(color: Colors.grey))),
+                    child: Center(child: Text('No activity yet.', style: TextStyle(color: Colors.grey))),
                   )
                 : ListView.builder(
                     shrinkWrap: true,
@@ -294,13 +404,24 @@ class _HomeScreenState extends State<HomeScreen> {
                     itemCount: _history.length,
                     itemBuilder: (context, index) {
                       final item = _history[index];
+                      final isMinus = item['coins'].toString().startsWith('-');
                       return Card(
                         margin: const EdgeInsets.only(bottom: 8),
                         child: ListTile(
-                          leading: const Icon(Icons.monetization_on, color: Colors.amber),
+                          leading: Icon(
+                            isMinus ? Icons.call_made : Icons.monetization_on,
+                            color: isMinus ? Colors.red : Colors.amber,
+                          ),
                           title: Text(item['title']),
                           subtitle: Text(item['time']),
-                          trailing: Text(item['coins'], style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 16)),
+                          trailing: Text(
+                            item['coins'],
+                            style: TextStyle(
+                              color: isMinus ? Colors.red : Colors.green,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
                         ),
                       );
                     },
